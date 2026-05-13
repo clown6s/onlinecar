@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package passenger;
+
+option go_package = "./pb";
+
+// ========== 乘客服务 ==========
+service Passenger {
+  // 注册
+  rpc Register(RegisterReq) returns(RegisterResp);
+  // 登录
+  rpc Login(LoginReq) returns(LoginResp);
+  // 获取乘客信息
+  rpc GetPassenger(GetPassengerReq) returns(PassengerInfo);
+  // 创建行程
+  rpc CreateTrip(CreateTripReq) returns(TripResp);
+}
+
+message Empty {}
+
+// 注册请求
+message RegisterReq {
+  string passenger_name   = 1;
+  string passenger_phone  = 2;
+  int64  passenger_gender = 3; // 0未知 1男 2女
+}
+
+// 注册响应
+message RegisterResp {
+  int64  id               = 1;
+  string passenger_name   = 2;
+  string passenger_phone  = 3;
+  int64  state            = 4; // 0有效 1失效
+}
+
+// 登录请求（手机号直接登录）
+message LoginReq {
+  string passenger_phone = 1;
+}
+
+// 登录响应
+message LoginResp {
+  int64  id              = 1;
+  string passenger_name  = 2;
+  string passenger_phone = 3;
+  int64  state           = 4;
+  string profile_photo   = 5;
+}
+
+// 获取乘客信息
+message GetPassengerReq {
+  int64 id = 1;
+}
+
+// 乘客详细信息
+message PassengerInfo {
+  int64  id               = 1;
+  string passenger_name   = 2;
+  string passenger_phone  = 3;
+  int64  passenger_gender = 4;
+  int64  state            = 5; // 0有效 1失效
+  string profile_photo    = 6;
+}
+
+// 创建行程
+message CreateTripReq {
+  int64  passenger_id = 1;
+  string origin       = 2;
+  string destination  = 3;
+  double origin_lng   = 4;
+  double origin_lat   = 5;
+  double dest_lng     = 6;
+  double dest_lat     = 7;
+}
+
+// 行程响应
+message TripResp {
+  int64  id           = 1;
+  int64  passenger_id = 2;
+  int64  driver_id    = 3;
+  string origin       = 4;
+  string destination  = 5;
+  int64  status       = 6;
+  double fare         = 7;
+}

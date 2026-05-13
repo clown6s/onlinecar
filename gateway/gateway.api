@@ -1,0 +1,127 @@
+syntax = "v1"
+
+info (
+	title:   "OnlineCar Gateway API"
+	desc:    "网约车平台API网关"
+	version: "1.0"
+)
+
+// ========== Driver 相关 ==========
+type (
+	// 司机注册请求
+	DriverRegisterReq {
+		Name     string `json:"name"`
+		Phone    string `json:"phone"`
+		CarNo    string `json:"carNo"`
+		CarType  string `json:"carType"`
+		Password string `json:"password"`
+	}
+	// 司机登录请求
+	DriverLoginReq {
+		Phone    string `json:"phone"`
+		Password string `json:"password"`
+	}
+	// 司机位置上报
+	DriverLocationReq {
+		Lng float64 `json:"lng"`
+		Lat float64 `json:"lat"`
+	}
+	// 司机响应
+	DriverResp {
+		Id       int64  `json:"id"`
+		Name     string `json:"name"`
+		Phone    string `json:"phone"`
+		CarNo    string `json:"carNo"`
+		CarType  string `json:"carType"`
+		Status   int64  `json:"status"`
+	}
+)
+
+// ========== Passenger 相关 ==========
+type (
+	// 乘客注册请求
+	PassengerRegisterReq {
+		Name     string `json:"name"`
+		Phone    string `json:"phone"`
+		Password string `json:"password"`
+	}
+	// 乘客登录请求
+	PassengerLoginReq {
+		Phone    string `json:"phone"`
+		Password string `json:"password"`
+	}
+	// 乘客响应
+	PassengerResp {
+		Id     int64  `json:"id"`
+		Name   string `json:"name"`
+		Phone  string `json:"phone"`
+		Status int64  `json:"status"`
+	}
+)
+
+// ========== Trip 相关 ==========
+type (
+	// 发起行程
+	CreateTripReq {
+		Origin      string  `json:"origin"`
+		Destination string  `json:"destination"`
+		OriginLng   float64 `json:"originLng"`
+		OriginLat   float64 `json:"originLat"`
+		DestLng     float64 `json:"destLng"`
+		DestLat     float64 `json:"destLat"`
+	}
+	// 行程响应
+	TripResp {
+		Id          int64   `json:"id"`
+		PassengerId int64   `json:"passengerId"`
+		DriverId    int64   `json:"driverId"`
+		Origin      string  `json:"origin"`
+		Destination string  `json:"destination"`
+		Status      int64   `json:"status"`
+		Fare        float64 `json:"fare"`
+	}
+)
+
+@server (
+	prefix: /api/v1
+	group:  driver
+)
+service gateway-api {
+	@handler DriverRegister
+	post /driver/register (DriverRegisterReq)
+
+	@handler DriverLogin
+	post /driver/login (DriverLoginReq)
+}
+
+@server (
+	prefix: /api/v1
+	group:  passenger
+)
+service gateway-api {
+	@handler PassengerRegister
+	post /passenger/register (PassengerRegisterReq)
+
+	@handler PassengerLogin
+	post /passenger/login (PassengerLoginReq)
+}
+
+@server (
+	prefix: /api/v1
+	group:  driver
+	jwt:    AuthDriver
+)
+service gateway-api {
+	@handler UpdateDriverLocation
+	post /driver/location (DriverLocationReq)
+}
+
+@server (
+	prefix: /api/v1
+	group:  trip
+	jwt:    AuthPassenger
+)
+service gateway-api {
+	@handler CreateTrip
+	post /trip (CreateTripReq)
+}

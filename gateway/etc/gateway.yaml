@@ -1,0 +1,33 @@
+Name: gateway-api
+Host: 0.0.0.0
+Port: 8888
+
+# JWT 配置
+AuthDriver:
+  AccessSecret: "onlinecar-driver-secret-2026"
+  AccessExpire: 86400s
+
+AuthPassenger:
+  AccessSecret: "onlinecar-passenger-secret-2026"
+  AccessExpire: 86400s
+
+# Driver RPC
+DriverRpc:
+  Etcd:
+    Hosts:
+      - 10.211.55.5:2379
+    Key: driver.rpc
+
+# Passenger RPC
+PassengerRpc:
+  Etcd:
+    Hosts:
+      - 10.211.55.5:2379
+    Key: passenger.rpc
+
+# 日志配置
+Log:
+  ServiceName: gateway-api
+  Mode: console
+  Level: info
+  Encoding: json

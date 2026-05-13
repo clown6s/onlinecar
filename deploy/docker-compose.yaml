@@ -1,0 +1,88 @@
+version: "3.8"
+
+services:
+  # ========== 基础设施 ==========
+  etcd:
+    image: bitnami/etcd:3.5
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
+    ports:
+      - "2379:2379"
+    volumes:
+      - etcd_data:/bitnami/etcd
+    networks:
+      - onlinecar
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: "123456"
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - onlinecar
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - onlinecar
+
+  # ========== 业务服务 ==========
+  driver:
+    build:
+      context: ../driver
+      dockerfile: ../deploy/driver/Dockerfile
+    ports:
+      - "9001:9001"
+    depends_on:
+      - etcd
+      - mysql
+      - redis
+    networks:
+      - onlinecar
+    restart: on-failure
+
+  passenger:
+    build:
+      context: ../passenger
+      dockerfile: ../deploy/passenger/Dockerfile
+    ports:
+      - "9002:9002"
+    depends_on:
+      - etcd
+      - mysql
+      - redis
+    networks:
+      - onlinecar
+    restart: on-failure
+
+  gateway:
+    build:
+      context: ../gateway
+      dockerfile: ../deploy/gateway/Dockerfile
+    ports:
+      - "8888:8888"
+    depends_on:
+      - etcd
+      - driver
+      - passenger
+    networks:
+      - onlinecar
+    restart: on-failure
+
+volumes:
+  etcd_data:
+  mysql_data:
+  redis_data:
+
+networks:
+  onlinecar:
+    driver: bridge
