@@ -103,7 +103,7 @@ services:
   mysql:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_ROOT_PASSWORD: "OnlineCar@2026#Prod"
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
@@ -121,7 +121,7 @@ services:
     networks:
       - onlinecar
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pOnlineCar@2026#Prod"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -141,7 +141,7 @@ services:
     image: redis:8.6.2-alpine
     command: >
       redis-server
-      --requirepass ${REDIS_PASSWORD}
+      --requirepass "OnlineCar@2026#Redis"
       --maxmemory 256mb
       --maxmemory-policy allkeys-lru
       --appendonly yes
@@ -154,7 +154,7 @@ services:
     networks:
       - onlinecar
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "OnlineCar@2026#Redis", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -277,8 +277,8 @@ services:
       OTEL_SERVICE_NAME: driver.rpc
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
       OTEL_TRACES_SAMPLER: always_on
-      DB_PASSWORD: ${DB_DRIVER_PASS}
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      DB_PASSWORD: "OnlineCar@2026#Prod"
+      REDIS_PASSWORD: "OnlineCar@2026#Redis"
     depends_on:
       log-init:
         condition: service_completed_successfully
@@ -325,8 +325,8 @@ services:
       OTEL_SERVICE_NAME: passenger.rpc
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
       OTEL_TRACES_SAMPLER: always_on
-      DB_PASSWORD: ${DB_PASSENGER_PASS}
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      DB_PASSWORD: "OnlineCar@2026#Prod"
+      REDIS_PASSWORD: "OnlineCar@2026#Redis"
     depends_on:
       log-init:
         condition: service_completed_successfully
@@ -372,8 +372,8 @@ services:
       OTEL_SERVICE_NAME: gateway-api
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
       OTEL_TRACES_SAMPLER: always_on
-      JWT_DRIVER_SECRET: ${JWT_DRIVER_SECRET}
-      JWT_PASSENGER_SECRET: ${JWT_PASSENGER_SECRET}
+      JWT_DRIVER_SECRET: "oc-drv-a3f8e2c1d9b45678prod2026"
+      JWT_PASSENGER_SECRET: "oc-pax-7e1b9c4f2a8d5678prod2026"
     depends_on:
       log-init:
         condition: service_completed_successfully
