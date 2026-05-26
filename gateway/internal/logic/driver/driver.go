@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"onlinecar-gateway/common/ctxdata"
+	"onlinecar-gateway/internal/logic/sms"
 	"onlinecar-gateway/internal/svc"
 	"onlinecar-gateway/internal/types"
 	driverpb "onlinecar-gateway/pb/driver"
@@ -59,6 +60,11 @@ func NewLoginLogic(ctx context.Context, svcCtx *svc.ServiceContext) *LoginLogic 
 
 func (l *LoginLogic) Login(req *types.DriverLoginReq) (map[string]any, error) {
 	l.Infof("Gateway->DriverRpc.Login, phone=%s", req.Phone)
+
+	// 校验验证码
+	if err := sms.VerifyCode(l.ctx, l.svcCtx, "driver", req.Phone, req.Code); err != nil {
+		return nil, err
+	}
 
 	resp, err := l.svcCtx.DriverRpc.Login(l.ctx, &driverpb.LoginReq{
 		DriverPhone: req.Phone,

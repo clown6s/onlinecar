@@ -6,6 +6,8 @@ type ctxKey string
 
 const UID ctxKey = "uid"
 
+const RequestIDKey ctxKey = "requestId"
+
 func SetUID(ctx context.Context, uid int64) context.Context {
 	return context.WithValue(ctx, UID, uid)
 }
@@ -15,4 +17,15 @@ func GetUID(ctx context.Context) int64 {
 		return v
 	}
 	return 0
+}
+
+func SetRequestID(ctx context.Context, rid string) context.Context {
+	return context.WithValue(ctx, RequestIDKey, rid)
+}
+
+func GetRequestID(ctx context.Context) string {
+	if v, ok := ctx.Value(RequestIDKey).(string); ok {
+		return v
+	}
+	return ""
 }

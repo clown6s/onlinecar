@@ -58,3 +58,9 @@ func (s *DriverServer) UpdateDriverWorkStatus(ctx context.Context, in *pb.Update
 	l := driverlogic.NewUpdateDriverWorkStatusLogic(ctx, s.svcCtx)
 	return l.UpdateDriverWorkStatus(in)
 }
+
+// 检查手机号是否注册
+func (s *DriverServer) CheckPhone(ctx context.Context, in *pb.CheckPhoneReq) (*pb.CheckPhoneResp, error) {
+	l := driverlogic.NewCheckPhoneLogic(ctx, s.svcCtx)
+	return l.CheckPhone(in)
+}

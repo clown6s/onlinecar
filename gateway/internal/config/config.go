@@ -3,6 +3,7 @@ package config
 import (
 	"time"
 
+	"github.com/zeromicro/go-zero/core/stores/redis"
 	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/zrpc"
 )
@@ -18,4 +19,5 @@ type Config struct {
 	AuthPassenger JwtConf
 	DriverRpc     zrpc.RpcClientConf
 	PassengerRpc  zrpc.RpcClientConf
+	RedisConf     redis.RedisConf
 }

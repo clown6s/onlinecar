@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"onlinecar-gateway/internal/logic/sms"
 	"onlinecar-gateway/internal/svc"
 	"onlinecar-gateway/internal/types"
 	passengerpb "onlinecar-gateway/pb/passenger"
@@ -56,6 +57,11 @@ func NewLoginLogic(ctx context.Context, svcCtx *svc.ServiceContext) *LoginLogic 
 
 func (l *LoginLogic) Login(req *types.PassengerLoginReq) (map[string]any, error) {
 	l.Infof("Gateway->PassengerRpc.Login, phone=%s", req.Phone)
+
+	// 校验验证码
+	if err := sms.VerifyCode(l.ctx, l.svcCtx, "passenger", req.Phone, req.Code); err != nil {
+		return nil, err
+	}
 
 	resp, err := l.svcCtx.PassengerRpc.Login(l.ctx, &passengerpb.LoginReq{
 		PassengerPhone: req.Phone,

@@ -3,6 +3,8 @@ package response
 import (
 	"net/http"
 
+	"onlinecar-gateway/common/errorx"
+
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
@@ -15,8 +17,13 @@ type Body struct {
 func Response(w http.ResponseWriter, resp any, err error) {
 	var body Body
 	if err != nil {
-		body.Code = -1
-		body.Msg = err.Error()
+		if codeErr, ok := err.(*errorx.CodeError); ok {
+			body.Code = codeErr.Code
+			body.Msg = codeErr.Msg
+		} else {
+			body.Code = -1
+			body.Msg = err.Error()
+		}
 	} else {
 		body.Code = 0
 		body.Msg = "ok"

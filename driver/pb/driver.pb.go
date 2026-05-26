@@ -723,6 +723,96 @@ func (x *UpdateDriverWorkStatusReq) GetWorkStatus() int64 {
 	return 0
 }
 
+// 检查手机号请求
+type CheckPhoneReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DriverPhone   string                 `protobuf:"bytes,1,opt,name=driver_phone,json=driverPhone,proto3" json:"driver_phone,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckPhoneReq) Reset() {
+	*x = CheckPhoneReq{}
+	mi := &file_driver_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckPhoneReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckPhoneReq) ProtoMessage() {}
+
+func (x *CheckPhoneReq) ProtoReflect() protoreflect.Message {
+	mi := &file_driver_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckPhoneReq.ProtoReflect.Descriptor instead.
+func (*CheckPhoneReq) Descriptor() ([]byte, []int) {
+	return file_driver_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *CheckPhoneReq) GetDriverPhone() string {
+	if x != nil {
+		return x.DriverPhone
+	}
+	return ""
+}
+
+// 检查手机号响应
+type CheckPhoneResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Exists        bool                   `protobuf:"varint,1,opt,name=exists,proto3" json:"exists,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckPhoneResp) Reset() {
+	*x = CheckPhoneResp{}
+	mi := &file_driver_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckPhoneResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckPhoneResp) ProtoMessage() {}
+
+func (x *CheckPhoneResp) ProtoReflect() protoreflect.Message {
+	mi := &file_driver_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckPhoneResp.ProtoReflect.Descriptor instead.
+func (*CheckPhoneResp) Descriptor() ([]byte, []int) {
+	return file_driver_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *CheckPhoneResp) GetExists() bool {
+	if x != nil {
+		return x.Exists
+	}
+	return false
+}
+
 var File_driver_proto protoreflect.FileDescriptor
 
 const file_driver_proto_rawDesc = "" +
@@ -787,14 +877,20 @@ const file_driver_proto_rawDesc = "" +
 	"\x19UpdateDriverWorkStatusReq\x12\x1b\n" +
 	"\tdriver_id\x18\x01 \x01(\x03R\bdriverId\x12\x1f\n" +
 	"\vwork_status\x18\x02 \x01(\x03R\n" +
-	"workStatus2\x81\x03\n" +
+	"workStatus\"2\n" +
+	"\rCheckPhoneReq\x12!\n" +
+	"\fdriver_phone\x18\x01 \x01(\tR\vdriverPhone\"(\n" +
+	"\x0eCheckPhoneResp\x12\x16\n" +
+	"\x06exists\x18\x01 \x01(\bR\x06exists2\xbe\x03\n" +
 	"\x06Driver\x125\n" +
 	"\bRegister\x12\x13.driver.RegisterReq\x1a\x14.driver.RegisterResp\x12,\n" +
 	"\x05Login\x12\x10.driver.LoginReq\x1a\x11.driver.LoginResp\x12:\n" +
 	"\x0eUpdateLocation\x12\x19.driver.UpdateLocationReq\x1a\r.driver.Empty\x125\n" +
 	"\tGetDriver\x12\x14.driver.GetDriverReq\x1a\x12.driver.DriverInfo\x12S\n" +
 	"\x13GetDriverWorkStatus\x12\x1e.driver.GetDriverWorkStatusReq\x1a\x1c.driver.DriverWorkStatusInfo\x12J\n" +
-	"\x16UpdateDriverWorkStatus\x12!.driver.UpdateDriverWorkStatusReq\x1a\r.driver.EmptyB\x06Z\x04./pbb\x06proto3"
+	"\x16UpdateDriverWorkStatus\x12!.driver.UpdateDriverWorkStatusReq\x1a\r.driver.Empty\x12;\n" +
+	"\n" +
+	"CheckPhone\x12\x15.driver.CheckPhoneReq\x1a\x16.driver.CheckPhoneRespB\x06Z\x04./pbb\x06proto3"
 
 var (
 	file_driver_proto_rawDescOnce sync.Once
@@ -808,7 +904,7 @@ func file_driver_proto_rawDescGZIP() []byte {
 	return file_driver_proto_rawDescData
 }
 
-var file_driver_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_driver_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_driver_proto_goTypes = []any{
 	(*Empty)(nil),                     // 0: driver.Empty
 	(*RegisterReq)(nil),               // 1: driver.RegisterReq
@@ -821,6 +917,8 @@ var file_driver_proto_goTypes = []any{
 	(*GetDriverWorkStatusReq)(nil),    // 8: driver.GetDriverWorkStatusReq
 	(*DriverWorkStatusInfo)(nil),      // 9: driver.DriverWorkStatusInfo
 	(*UpdateDriverWorkStatusReq)(nil), // 10: driver.UpdateDriverWorkStatusReq
+	(*CheckPhoneReq)(nil),             // 11: driver.CheckPhoneReq
+	(*CheckPhoneResp)(nil),            // 12: driver.CheckPhoneResp
 }
 var file_driver_proto_depIdxs = []int32{
 	1,  // 0: driver.Driver.Register:input_type -> driver.RegisterReq
@@ -829,14 +927,16 @@ var file_driver_proto_depIdxs = []int32{
 	6,  // 3: driver.Driver.GetDriver:input_type -> driver.GetDriverReq
 	8,  // 4: driver.Driver.GetDriverWorkStatus:input_type -> driver.GetDriverWorkStatusReq
 	10, // 5: driver.Driver.UpdateDriverWorkStatus:input_type -> driver.UpdateDriverWorkStatusReq
-	2,  // 6: driver.Driver.Register:output_type -> driver.RegisterResp
-	4,  // 7: driver.Driver.Login:output_type -> driver.LoginResp
-	0,  // 8: driver.Driver.UpdateLocation:output_type -> driver.Empty
-	7,  // 9: driver.Driver.GetDriver:output_type -> driver.DriverInfo
-	9,  // 10: driver.Driver.GetDriverWorkStatus:output_type -> driver.DriverWorkStatusInfo
-	0,  // 11: driver.Driver.UpdateDriverWorkStatus:output_type -> driver.Empty
-	6,  // [6:12] is the sub-list for method output_type
-	0,  // [0:6] is the sub-list for method input_type
+	11, // 6: driver.Driver.CheckPhone:input_type -> driver.CheckPhoneReq
+	2,  // 7: driver.Driver.Register:output_type -> driver.RegisterResp
+	4,  // 8: driver.Driver.Login:output_type -> driver.LoginResp
+	0,  // 9: driver.Driver.UpdateLocation:output_type -> driver.Empty
+	7,  // 10: driver.Driver.GetDriver:output_type -> driver.DriverInfo
+	9,  // 11: driver.Driver.GetDriverWorkStatus:output_type -> driver.DriverWorkStatusInfo
+	0,  // 12: driver.Driver.UpdateDriverWorkStatus:output_type -> driver.Empty
+	12, // 13: driver.Driver.CheckPhone:output_type -> driver.CheckPhoneResp
+	7,  // [7:14] is the sub-list for method output_type
+	0,  // [0:7] is the sub-list for method input_type
 	0,  // [0:0] is the sub-list for extension type_name
 	0,  // [0:0] is the sub-list for extension extendee
 	0,  // [0:0] is the sub-list for field type_name
@@ -853,7 +953,7 @@ func file_driver_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_driver_proto_rawDesc), len(file_driver_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

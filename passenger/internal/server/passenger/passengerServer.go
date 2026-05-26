@@ -46,3 +46,9 @@ func (s *PassengerServer) CreateTrip(ctx context.Context, in *pb.CreateTripReq) 
 	l := passengerlogic.NewCreateTripLogic(ctx, s.svcCtx)
 	return l.CreateTrip(in)
 }
+
+// 检查手机号是否注册
+func (s *PassengerServer) CheckPhone(ctx context.Context, in *pb.CheckPhoneReq) (*pb.CheckPhoneResp, error) {
+	l := passengerlogic.NewCheckPhoneLogic(ctx, s.svcCtx)
+	return l.CheckPhone(in)
+}

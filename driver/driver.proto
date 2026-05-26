@@ -18,6 +18,8 @@ service Driver {
   rpc GetDriverWorkStatus(GetDriverWorkStatusReq) returns(DriverWorkStatusInfo);
   // 更新司机状态
   rpc UpdateDriverWorkStatus(UpdateDriverWorkStatusReq) returns(Empty);
+  // 检查手机号是否注册
+  rpc CheckPhone(CheckPhoneReq) returns(CheckPhoneResp);
 }
 
 message Empty {}
@@ -97,4 +99,14 @@ message DriverWorkStatusInfo {
 message UpdateDriverWorkStatusReq {
   int64 driver_id   = 1;
   int64 work_status = 2; // 0收车 1出车 2暂停
+}
+
+// 检查手机号请求
+message CheckPhoneReq {
+  string driver_phone = 1;
+}
+
+// 检查手机号响应
+message CheckPhoneResp {
+  bool exists = 1;
 }

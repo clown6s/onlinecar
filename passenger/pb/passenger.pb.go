@@ -625,6 +625,96 @@ func (x *TripResp) GetFare() float64 {
 	return 0
 }
 
+// 检查手机号请求
+type CheckPhoneReq struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	PassengerPhone string                 `protobuf:"bytes,1,opt,name=passenger_phone,json=passengerPhone,proto3" json:"passenger_phone,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *CheckPhoneReq) Reset() {
+	*x = CheckPhoneReq{}
+	mi := &file_passenger_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckPhoneReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckPhoneReq) ProtoMessage() {}
+
+func (x *CheckPhoneReq) ProtoReflect() protoreflect.Message {
+	mi := &file_passenger_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckPhoneReq.ProtoReflect.Descriptor instead.
+func (*CheckPhoneReq) Descriptor() ([]byte, []int) {
+	return file_passenger_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *CheckPhoneReq) GetPassengerPhone() string {
+	if x != nil {
+		return x.PassengerPhone
+	}
+	return ""
+}
+
+// 检查手机号响应
+type CheckPhoneResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Exists        bool                   `protobuf:"varint,1,opt,name=exists,proto3" json:"exists,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckPhoneResp) Reset() {
+	*x = CheckPhoneResp{}
+	mi := &file_passenger_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckPhoneResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckPhoneResp) ProtoMessage() {}
+
+func (x *CheckPhoneResp) ProtoReflect() protoreflect.Message {
+	mi := &file_passenger_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckPhoneResp.ProtoReflect.Descriptor instead.
+func (*CheckPhoneResp) Descriptor() ([]byte, []int) {
+	return file_passenger_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *CheckPhoneResp) GetExists() bool {
+	if x != nil {
+		return x.Exists
+	}
+	return false
+}
+
 var File_passenger_proto protoreflect.FileDescriptor
 
 const file_passenger_proto_rawDesc = "" +
@@ -674,13 +764,19 @@ const file_passenger_proto_rawDesc = "" +
 	"\x06origin\x18\x04 \x01(\tR\x06origin\x12 \n" +
 	"\vdestination\x18\x05 \x01(\tR\vdestination\x12\x16\n" +
 	"\x06status\x18\x06 \x01(\x03R\x06status\x12\x12\n" +
-	"\x04fare\x18\a \x01(\x01R\x04fare2\xff\x01\n" +
+	"\x04fare\x18\a \x01(\x01R\x04fare\"8\n" +
+	"\rCheckPhoneReq\x12'\n" +
+	"\x0fpassenger_phone\x18\x01 \x01(\tR\x0epassengerPhone\"(\n" +
+	"\x0eCheckPhoneResp\x12\x16\n" +
+	"\x06exists\x18\x01 \x01(\bR\x06exists2\xc2\x02\n" +
 	"\tPassenger\x12;\n" +
 	"\bRegister\x12\x16.passenger.RegisterReq\x1a\x17.passenger.RegisterResp\x122\n" +
 	"\x05Login\x12\x13.passenger.LoginReq\x1a\x14.passenger.LoginResp\x12D\n" +
 	"\fGetPassenger\x12\x1a.passenger.GetPassengerReq\x1a\x18.passenger.PassengerInfo\x12;\n" +
 	"\n" +
-	"CreateTrip\x12\x18.passenger.CreateTripReq\x1a\x13.passenger.TripRespB\x06Z\x04./pbb\x06proto3"
+	"CreateTrip\x12\x18.passenger.CreateTripReq\x1a\x13.passenger.TripResp\x12A\n" +
+	"\n" +
+	"CheckPhone\x12\x18.passenger.CheckPhoneReq\x1a\x19.passenger.CheckPhoneRespB\x06Z\x04./pbb\x06proto3"
 
 var (
 	file_passenger_proto_rawDescOnce sync.Once
@@ -694,7 +790,7 @@ func file_passenger_proto_rawDescGZIP() []byte {
 	return file_passenger_proto_rawDescData
 }
 
-var file_passenger_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_passenger_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_passenger_proto_goTypes = []any{
 	(*Empty)(nil),           // 0: passenger.Empty
 	(*RegisterReq)(nil),     // 1: passenger.RegisterReq
@@ -705,21 +801,25 @@ var file_passenger_proto_goTypes = []any{
 	(*PassengerInfo)(nil),   // 6: passenger.PassengerInfo
 	(*CreateTripReq)(nil),   // 7: passenger.CreateTripReq
 	(*TripResp)(nil),        // 8: passenger.TripResp
+	(*CheckPhoneReq)(nil),   // 9: passenger.CheckPhoneReq
+	(*CheckPhoneResp)(nil),  // 10: passenger.CheckPhoneResp
 }
 var file_passenger_proto_depIdxs = []int32{
-	1, // 0: passenger.Passenger.Register:input_type -> passenger.RegisterReq
-	3, // 1: passenger.Passenger.Login:input_type -> passenger.LoginReq
-	5, // 2: passenger.Passenger.GetPassenger:input_type -> passenger.GetPassengerReq
-	7, // 3: passenger.Passenger.CreateTrip:input_type -> passenger.CreateTripReq
-	2, // 4: passenger.Passenger.Register:output_type -> passenger.RegisterResp
-	4, // 5: passenger.Passenger.Login:output_type -> passenger.LoginResp
-	6, // 6: passenger.Passenger.GetPassenger:output_type -> passenger.PassengerInfo
-	8, // 7: passenger.Passenger.CreateTrip:output_type -> passenger.TripResp
-	4, // [4:8] is the sub-list for method output_type
-	0, // [0:4] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	1,  // 0: passenger.Passenger.Register:input_type -> passenger.RegisterReq
+	3,  // 1: passenger.Passenger.Login:input_type -> passenger.LoginReq
+	5,  // 2: passenger.Passenger.GetPassenger:input_type -> passenger.GetPassengerReq
+	7,  // 3: passenger.Passenger.CreateTrip:input_type -> passenger.CreateTripReq
+	9,  // 4: passenger.Passenger.CheckPhone:input_type -> passenger.CheckPhoneReq
+	2,  // 5: passenger.Passenger.Register:output_type -> passenger.RegisterResp
+	4,  // 6: passenger.Passenger.Login:output_type -> passenger.LoginResp
+	6,  // 7: passenger.Passenger.GetPassenger:output_type -> passenger.PassengerInfo
+	8,  // 8: passenger.Passenger.CreateTrip:output_type -> passenger.TripResp
+	10, // 9: passenger.Passenger.CheckPhone:output_type -> passenger.CheckPhoneResp
+	5,  // [5:10] is the sub-list for method output_type
+	0,  // [0:5] is the sub-list for method input_type
+	0,  // [0:0] is the sub-list for extension type_name
+	0,  // [0:0] is the sub-list for extension extendee
+	0,  // [0:0] is the sub-list for field type_name
 }
 
 func init() { file_passenger_proto_init() }
@@ -733,7 +833,7 @@ func file_passenger_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_passenger_proto_rawDesc), len(file_passenger_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
