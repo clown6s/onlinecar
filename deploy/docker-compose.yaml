@@ -269,7 +269,7 @@ services:
   driver:
     build:
       context: ../driver
-      dockerfile: deploy/driver/Dockerfile
+      dockerfile: ../deploy/driver/Dockerfile
     # gRPC 端口仅容器内互通，不暴露
     # ports:
     #   - "6000:6000"
@@ -317,7 +317,7 @@ services:
   passenger:
     build:
       context: ../passenger
-      dockerfile: deploy/passenger/Dockerfile
+      dockerfile: ../deploy/passenger/Dockerfile
     # gRPC 端口仅容器内互通，不暴露
     # ports:
     #   - "6001:6001"
@@ -365,7 +365,7 @@ services:
   gateway:
     build:
       context: ../gateway
-      dockerfile: deploy/gateway/Dockerfile
+      dockerfile: ../deploy/gateway/Dockerfile
     ports:
       - "7000:7000"
     environment:
