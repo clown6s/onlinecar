@@ -1,0 +1,28 @@
+service:
+  extensions:
+    health_check_v2:
+      endpoint: "0.0.0.0:13133"
+      check_host: true
+  pipelines:
+    traces:
+      receivers:
+        otlp:
+          protocols:
+            grpc:
+              endpoint: "0.0.0.0:4317"
+            http:
+              endpoint: "0.0.0.0:4318"
+      processors:
+        batch:
+          timeout: 5s
+          send_batch_size: 1024
+      exporters:
+        jaeger_storage:
+          trace_storage:
+            memory:
+              max_traces: 100000
+  telemetry:
+    logs:
+      level: info
+      output_paths:
+        - stdout

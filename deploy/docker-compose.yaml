@@ -181,7 +181,7 @@ services:
     #   - "4317:4317"
     #   - "4318:4318"
     volumes:
-      - ./jaeger-config.yaml:/etc/jaeger/jaeger.yaml:ro
+      - ./config/jaeger-config.yaml:/etc/jaeger/jaeger.yaml:ro
     networks:
       - onlinecar
     healthcheck:
@@ -234,7 +234,7 @@ services:
     volumes:
       - onlinecar_logs:/var/log/onlinecar:ro
       - promtail_positions:/var/promtail/positions
-      - ./promtail-config.yaml:/etc/promtail/config.yaml:ro
+      - ./config/promtail-config.yaml:/etc/promtail/config.yaml:ro
     depends_on:
       loki:
         condition: service_healthy
