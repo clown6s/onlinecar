@@ -1,0 +1,42 @@
+Name: gateway-api
+Host: 0.0.0.0
+Port: 7000
+Timeout: 30000
+GracefulShutdownTimeout: 25s
+
+# JWT 配置（Secret 从环境变量注入）
+AuthDriver:
+  AccessSecret: "oc-drv-a3f8e2c1d9b45678prod2026"
+  AccessExpire: 86400s
+
+AuthPassenger:
+  AccessSecret: "oc-pax-7e1b9c4f2a8d5678prod2026"
+  AccessExpire: 86400s
+
+# Driver RPC
+DriverRpc:
+  Etcd:
+    Hosts:
+      - etcd-1:2379
+      - etcd-2:2379
+      - etcd-3:2379
+    Key: driver.rpc
+
+# Passenger RPC
+PassengerRpc:
+  Etcd:
+    Hosts:
+      - etcd-1:2379
+      - etcd-2:2379
+      - etcd-3:2379
+    Key: passenger.rpc
+
+# 日志（file 模式，Promtail 采集）
+Log:
+  ServiceName: gateway-api
+  Mode: file
+  Path: /var/log/onlinecar
+  Level: info
+  Encoding: json
+  KeepDays: 7
+  Compress: true

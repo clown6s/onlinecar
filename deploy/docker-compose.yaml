@@ -3,7 +3,7 @@ services:
 
   # etcd 3 节点集群
   etcd-1:
-    image: bitnami/etcd:3.5
+    image: quay.io/coreos/etcd:v3.6.9
     environment:
       ALLOW_NONE_AUTHENTICATION: "yes"
       ETCD_NAME: etcd1
@@ -37,7 +37,7 @@ services:
         max-file: "3"
 
   etcd-2:
-    image: bitnami/etcd:3.5
+    image: quay.io/coreos/etcd:v3.6.9
     environment:
       ALLOW_NONE_AUTHENTICATION: "yes"
       ETCD_NAME: etcd2
@@ -69,7 +69,7 @@ services:
         max-file: "3"
 
   etcd-3:
-    image: bitnami/etcd:3.5
+    image: quay.io/coreos/etcd:v3.6.9
     environment:
       ALLOW_NONE_AUTHENTICATION: "yes"
       ETCD_NAME: etcd3
@@ -101,7 +101,7 @@ services:
         max-file: "3"
 
   mysql:
-    image: mysql:8.0
+    image: mysql:8.4
     environment:
       MYSQL_ROOT_PASSWORD: "OnlineCar@2026#Prod"
     command:
@@ -141,7 +141,7 @@ services:
     image: redis:8.6.2-alpine
     command: >
       redis-server
-      --requirepass "OnlineCar@2026#Redis"
+      --requirepass OnlineCar@2026#Redis
       --maxmemory 256mb
       --maxmemory-policy allkeys-lru
       --appendonly yes

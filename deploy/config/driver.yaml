@@ -1,0 +1,30 @@
+Name: driver.rpc
+ListenOn: 0.0.0.0:6000
+Timeout: 30000
+GracefulShutdownTimeout: 25s
+
+Etcd:
+  Hosts:
+    - etcd-1:2379
+    - etcd-2:2379
+    - etcd-3:2379
+  Key: driver.rpc
+
+# MySQL
+DataSource: "root:OnlineCar@2026#Prod@tcp(mysql:3306)/onlinecar_driver?charset=utf8mb4&parseTime=true&loc=Local"
+
+# Redis
+RedisConf:
+  Host: redis:6379
+  Type: node
+  Pass: "OnlineCar@2026#Redis"
+
+# 日志（file 模式，Promtail 采集）
+Log:
+  ServiceName: driver.rpc
+  Mode: file
+  Path: /var/log/onlinecar
+  Level: info
+  Encoding: json
+  KeepDays: 7
+  Compress: true
