@@ -25,7 +25,7 @@ WORKDIR /app
 
 USER appuser
 
-COPY --from=builder --chown=appuser:appgroup /driver .
+COPY --from=builder --chown=appuser:appgroup /driver /driver
 COPY --from=builder --chown=appuser:appgroup /app/etc/driver.yaml ./etc/driver.yaml
 
 EXPOSE 6000

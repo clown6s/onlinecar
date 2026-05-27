@@ -25,7 +25,7 @@ WORKDIR /app
 
 USER appuser
 
-COPY --from=builder --chown=appuser:appgroup /gateway .
+COPY --from=builder --chown=appuser:appgroup /gateway /gateway
 COPY --from=builder --chown=appuser:appgroup /app/etc/gateway.yaml ./etc/gateway.yaml
 
 EXPOSE 7000

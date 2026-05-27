@@ -25,7 +25,7 @@ WORKDIR /app
 
 USER appuser
 
-COPY --from=builder --chown=appuser:appgroup /passenger .
+COPY --from=builder --chown=appuser:appgroup /passenger /passenger
 COPY --from=builder --chown=appuser:appgroup /app/etc/passenger.yaml ./etc/passenger.yaml
 
 EXPOSE 6001
