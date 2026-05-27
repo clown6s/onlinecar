@@ -2,16 +2,18 @@ package district
 
 import (
 	"net/http"
-	"strconv"
 
 	"onlinecar-gateway/common/errorx"
 	"onlinecar-gateway/common/response"
+	districtlogic "onlinecar-gateway/internal/logic/district"
 	"onlinecar-gateway/internal/svc"
+
+	"github.com/zeromicro/go-zero/rest/pathvar"
 )
 
 func GetProvincesHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		l := NewGetProvincesLogic(r.Context(), svcCtx)
+		l := districtlogic.NewGetProvincesLogic(r.Context(), svcCtx)
 		resp, err := l.GetProvinces()
 		response.Response(w, resp, err)
 	}
@@ -19,18 +21,14 @@ func GetProvincesHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 
 func GetChildrenHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		adCodeStr := r.PathValue("parentAdCode")
-		if adCodeStr == "" {
+		vars := pathvar.Vars(r)
+		parentAdCode := vars["parentAdCode"]
+		if parentAdCode == "" {
 			response.Error(w, http.StatusBadRequest, errorx.ErrCodeParam, "缺少 parentAdCode 参数")
 			return
 		}
-		parentAdCode, err := strconv.ParseUint(adCodeStr, 10, 32)
-		if err != nil {
-			response.Error(w, http.StatusBadRequest, errorx.ErrCodeParam, "parentAdCode 格式错误")
-			return
-		}
-		l := NewGetChildrenLogic(r.Context(), svcCtx)
-		resp, err := l.GetChildren(uint32(parentAdCode))
+		l := districtlogic.NewGetChildrenLogic(r.Context(), svcCtx)
+		resp, err := l.GetChildren(parentAdCode)
 		response.Response(w, resp, err)
 	}
 }

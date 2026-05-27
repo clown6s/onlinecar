@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
+	"strconv"
 
 	"onlinecar-district/internal/svc"
 	"onlinecar-district/pb"
@@ -42,8 +42,8 @@ func (l *GetChildrenLogic) GetChildren(in *pb.GetChildrenReq) (*pb.GetChildrenRe
 		}
 	}
 
-	// 2. 缓存未命中，查数据库
-	list, err := l.svcCtx.DistrictModel.FindByParentAdCode(l.ctx, in.ParentAdCode)
+	// 2. 缓存未命中，查数据库（parentAdCode 转 string 给 model）
+	list, err := l.svcCtx.DistrictModel.FindByParentAdCode(l.ctx, strconv.FormatUint(uint64(in.ParentAdCode), 10))
 	if err != nil {
 		l.Errorf("查询子级行政区失败, parentAdCode=%d, err=%v", in.ParentAdCode, err)
 		return nil, err
@@ -51,13 +51,16 @@ func (l *GetChildrenLogic) GetChildren(in *pb.GetChildrenReq) (*pb.GetChildrenRe
 
 	resp := &pb.GetChildrenResp{}
 	for _, d := range list {
-		resp.List = append(resp.List, &pb.DistrictNode{
+		node := &pb.DistrictNode{
 			Id:     d.Id,
-			AdCode: d.AdCode,
 			Name:   d.Name,
 			Level:  d.Level,
 			Center: d.Center,
-		})
+		}
+		if d.AdCode != nil {
+			node.AdCode = *d.AdCode
+		}
+		resp.List = append(resp.List, node)
 	}
 
 	// 3. 写入缓存（失败不影响响应）

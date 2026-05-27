@@ -2,6 +2,7 @@ package district
 
 import (
 	"context"
+	"strconv"
 
 	"onlinecar-gateway/common/errorx"
 	"onlinecar-gateway/internal/svc"
@@ -56,14 +57,21 @@ func NewGetChildrenLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetCh
 }
 
 // GetChildren 获取子级行政区
-func (l *GetChildrenLogic) GetChildren(parentAdCode uint32) ([]*types.DistrictNodeResp, error) {
-	l.Infof("Gateway->DistrictRpc.GetChildren, parentAdCode=%d", parentAdCode)
+func (l *GetChildrenLogic) GetChildren(parentAdCode string) ([]*types.DistrictNodeResp, error) {
+	// string -> uint32
+	code, err := strconv.ParseUint(parentAdCode, 10, 32)
+	if err != nil {
+		l.Errorf("parentAdCode 格式错误, value=%s, err=%v", parentAdCode, err)
+		return nil, errorx.NewCodeError(errorx.ErrCodeParam, "adCode格式错误")
+	}
+
+	l.Infof("Gateway->DistrictRpc.GetChildren, parentAdCode=%d", uint32(code))
 
 	resp, err := l.svcCtx.DistrictRpc.GetChildren(l.ctx, &districtpb.GetChildrenReq{
-		ParentAdCode: parentAdCode,
+		ParentAdCode: uint32(code),
 	})
 	if err != nil {
-		l.Errorf("DistrictRpc.GetChildren 失败, parentAdCode=%d, err=%v", parentAdCode, err)
+		l.Errorf("DistrictRpc.GetChildren 失败, parentAdCode=%d, err=%v", uint32(code), err)
 		return nil, errorx.MapRpcError(err)
 	}
 
@@ -78,6 +86,6 @@ func (l *GetChildrenLogic) GetChildren(parentAdCode uint32) ([]*types.DistrictNo
 		})
 	}
 
-	l.Infof("查询子级行政区成功, parentAdCode=%d, count=%d", parentAdCode, len(list))
+	l.Infof("查询子级行政区成功, parentAdCode=%d, count=%d", uint32(code), len(list))
 	return list, nil
 }

@@ -35,7 +35,7 @@ const (
 func (l *GetProvincesLogic) GetProvinces(in *pb.GetProvincesReq) (*pb.GetProvincesResp, error) {
 	l.Info("获取省级行政区列表")
 
-	cacheKey := fmt.Sprintf("%s%d", districtCachePrefix, 0)
+	cacheKey := fmt.Sprintf("%s%s", districtCachePrefix, "province")
 
 	// 1. 尝试读缓存
 	cached, err := l.svcCtx.Redis.Get(cacheKey)
@@ -47,8 +47,8 @@ func (l *GetProvincesLogic) GetProvinces(in *pb.GetProvincesReq) (*pb.GetProvinc
 		}
 	}
 
-	// 2. 缓存未命中，查数据库
-	list, err := l.svcCtx.DistrictModel.FindByParentAdCode(l.ctx, 0)
+	// 2. 缓存未命中，查数据库（省级 parent_adcode 为空）
+	list, err := l.svcCtx.DistrictModel.FindByParentAdCode(l.ctx, "")
 	if err != nil {
 		l.Errorf("查询省级行政区失败, err=%v", err)
 		return nil, err
@@ -56,13 +56,16 @@ func (l *GetProvincesLogic) GetProvinces(in *pb.GetProvincesReq) (*pb.GetProvinc
 
 	resp := &pb.GetProvincesResp{}
 	for _, d := range list {
-		resp.List = append(resp.List, &pb.DistrictNode{
+		node := &pb.DistrictNode{
 			Id:     d.Id,
-			AdCode: d.AdCode,
 			Name:   d.Name,
 			Level:  d.Level,
 			Center: d.Center,
-		})
+		}
+		if d.AdCode != nil {
+			node.AdCode = *d.AdCode
+		}
+		resp.List = append(resp.List, node)
 	}
 
 	// 3. 写入缓存（失败不影响响应）
