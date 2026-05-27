@@ -9,7 +9,7 @@ ENV GOPROXY=https://goproxy.cn,direct
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /driver driver.go
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /driver .
 
 # ========== 运行阶段 ==========
 FROM alpine:3.19
