@@ -2,8 +2,10 @@ package driverlogic
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"onlinecar-driver/internal/model"
 	"onlinecar-driver/internal/svc"
 	"onlinecar-driver/pb"
 
@@ -30,12 +32,12 @@ func (l *LoginLogic) Login(in *pb.LoginReq) (*pb.LoginResp, error) {
 
 	driverUser, err := l.svcCtx.DriverUserModel.FindByPhone(l.ctx, in.DriverPhone)
 	if err != nil {
+		if errors.Is(err, model.ErrNotFound) {
+			l.Errorf("司机不存在, phone=%s", in.DriverPhone)
+			return nil, fmt.Errorf("该手机号未注册")
+		}
 		l.Errorf("查询司机失败, phone=%s, err=%v", in.DriverPhone, err)
 		return nil, fmt.Errorf("查询失败，请稍后重试")
-	}
-	if driverUser == nil {
-		l.Errorf("司机不存在, phone=%s", in.DriverPhone)
-		return nil, fmt.Errorf("该手机号未注册")
 	}
 
 	// 验证码在 Gateway 层已校验，此处仅查询用户

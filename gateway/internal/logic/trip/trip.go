@@ -3,8 +3,8 @@ package trip
 import (
 	"context"
 
-	"onlinecar-gateway/common/ctxdata"
-	"onlinecar-gateway/common/errorx"
+	"onlinecar-common/ctxdata"
+	"onlinecar-common/errorx"
 	"onlinecar-gateway/internal/svc"
 	"onlinecar-gateway/internal/types"
 	passengerpb "onlinecar-gateway/pb/passenger"

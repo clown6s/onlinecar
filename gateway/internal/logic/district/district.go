@@ -4,7 +4,7 @@ import (
 	"context"
 	"strconv"
 
-	"onlinecar-gateway/common/errorx"
+	"onlinecar-common/errorx"
 	"onlinecar-gateway/internal/svc"
 	"onlinecar-gateway/internal/types"
 	districtpb "onlinecar-gateway/pb/district"

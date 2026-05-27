@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"onlinecar-passenger/common/errorx"
+	"onlinecar-common/errorx"
 	"onlinecar-passenger/internal/model"
 	"onlinecar-passenger/internal/svc"
 	"onlinecar-passenger/pb"

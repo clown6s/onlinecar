@@ -22,7 +22,7 @@ services:
     networks:
       - onlinecar
     healthcheck:
-      test: ["CMD-SHELL", "kill -0 1"]
+      test: ["CMD-SHELL", "etcdctl endpoint health --cluster -w json 2>/dev/null | grep -q '\"health\": true' || ETCDCTL_USER=root ETCDCTL_PASSWORD=OnlineCar@2026#Etcd etcdctl endpoint health --cluster -w json 2>/dev/null | grep -q '\"health\": true' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -56,7 +56,7 @@ services:
     networks:
       - onlinecar
     healthcheck:
-      test: ["CMD-SHELL", "kill -0 1"]
+      test: ["CMD-SHELL", "etcdctl endpoint health --cluster -w json 2>/dev/null | grep -q '\"health\": true' || ETCDCTL_USER=root ETCDCTL_PASSWORD=OnlineCar@2026#Etcd etcdctl endpoint health --cluster -w json 2>/dev/null | grep -q '\"health\": true' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -90,7 +90,7 @@ services:
     networks:
       - onlinecar
     healthcheck:
-      test: ["CMD-SHELL", "kill -0 1"]
+      test: ["CMD-SHELL", "etcdctl endpoint health --cluster -w json 2>/dev/null | grep -q '\"health\": true' || ETCDCTL_USER=root ETCDCTL_PASSWORD=OnlineCar@2026#Etcd etcdctl endpoint health --cluster -w json 2>/dev/null | grep -q '\"health\": true' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -113,6 +113,9 @@ services:
     image: mysql:8.4
     environment:
       MYSQL_ROOT_PASSWORD: "OnlineCar@2026#Prod"
+      MYSQL_DATABASE: online_car
+      MYSQL_USER: onlinecar_app
+      MYSQL_PASSWORD: "${DB_APP_PASSWORD:-OnlineCar@2026#App}"
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
@@ -165,11 +168,13 @@ services:
     networks:
       - onlinecar
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "OnlineCar@2026#Redis", "ping"]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=$$REDIS_PASSWORD redis-cli ping"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
+    environment:
+      - REDIS_PASSWORD=OnlineCar@2026#Redis
     deploy:
       resources:
         limits:
@@ -381,6 +386,7 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
       OTEL_TRACES_SAMPLER: always_on
       DB_PASSWORD: "OnlineCar@2026#Prod"
+      DB_APP_PASSWORD: "${DB_APP_PASSWORD:-OnlineCar@2026#App}"
       REDIS_PASSWORD: "OnlineCar@2026#Redis"
     depends_on:
       log-init:
@@ -431,6 +437,7 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
       OTEL_TRACES_SAMPLER: always_on
       DB_PASSWORD: "OnlineCar@2026#Prod"
+      DB_APP_PASSWORD: "${DB_APP_PASSWORD:-OnlineCar@2026#App}"
       REDIS_PASSWORD: "OnlineCar@2026#Redis"
     depends_on:
       log-init:
@@ -481,6 +488,7 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
       OTEL_TRACES_SAMPLER: always_on
       DB_PASSWORD: "OnlineCar@2026#Prod"
+      DB_APP_PASSWORD: "${DB_APP_PASSWORD:-OnlineCar@2026#App}"
       REDIS_PASSWORD: "OnlineCar@2026#Redis"
     depends_on:
       log-init:
@@ -537,11 +545,11 @@ services:
       etcd-setup:
         condition: service_completed_successfully
       driver:
-        condition: service_started
+        condition: service_healthy
       passenger:
-        condition: service_started
+        condition: service_healthy
       district:
-        condition: service_started
+        condition: service_healthy
       jaeger:
         condition: service_healthy
     volumes:

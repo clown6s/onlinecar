@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net"
 	"net/http"
 	"strings"
@@ -26,6 +27,8 @@ type RateLimitMiddleware struct {
 	cleanupInterval time.Duration
 	maxIdle         time.Duration // IP 无请求多久后清理
 	trustedSubnets  []*net.IPNet  // 可信代理网段
+	ctx             context.Context
+	cancel          context.CancelFunc
 }
 
 func NewRateLimitMiddleware(r int, trustedSubnets ...string) *RateLimitMiddleware {
@@ -33,12 +36,15 @@ func NewRateLimitMiddleware(r int, trustedSubnets ...string) *RateLimitMiddlewar
 		r = 1
 	}
 	burst := r
+	ctx, cancel := context.WithCancel(context.Background())
 	m := &RateLimitMiddleware{
 		rate:            r,
 		burst:           burst,
 		limiters:        make(map[string]*ipLimiter),
 		cleanupInterval: 5 * time.Minute,
 		maxIdle:         10 * time.Minute,
+		ctx:             ctx,
+		cancel:          cancel,
 	}
 	// 解析可信代理网段（CIDR 格式）
 	for _, cidr := range trustedSubnets {
@@ -97,22 +103,32 @@ func (m *RateLimitMiddleware) getLimiter(ip string) *ipLimiter {
 func (m *RateLimitMiddleware) cleanupLoop() {
 	ticker := time.NewTicker(m.cleanupInterval)
 	defer ticker.Stop()
-	for range ticker.C {
-		m.mu.Lock()
-		now := time.Now()
-		count := 0
-		for ip, limiter := range m.limiters {
-			if now.Sub(limiter.lastRef) > m.maxIdle {
-				delete(m.limiters, ip)
-				count++
+	for {
+		select {
+		case <-m.ctx.Done():
+			return
+		case <-ticker.C:
+			m.mu.Lock()
+			now := time.Now()
+			count := 0
+			for ip, limiter := range m.limiters {
+				if now.Sub(limiter.lastRef) > m.maxIdle {
+					delete(m.limiters, ip)
+					count++
+				}
+			}
+			m.mu.Unlock()
+			if count > 0 {
+				logx.Infof("[RATELIMIT] 清理了 %d 个过期 IP 限流器, 剩余 %d 个",
+					count, len(m.limiters))
 			}
 		}
-		m.mu.Unlock()
-		if count > 0 {
-			logx.Infof("[RATELIMIT] 清理了 %d 个过期 IP 限流器, 剩余 %d 个",
-				count, len(m.limiters))
-		}
 	}
+}
+
+// Stop 停止 cleanupLoop goroutine
+func (m *RateLimitMiddleware) Stop() {
+	m.cancel()
 }
 
 // GetClientIP 获取客户端真实 IP

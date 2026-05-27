@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"onlinecar-gateway/common/errorx"
+	"onlinecar-common/errorx"
 
 	"github.com/zeromicro/go-zero/rest/httpx"
 )

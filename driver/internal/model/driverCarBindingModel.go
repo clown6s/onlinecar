@@ -48,10 +48,10 @@ func NewDriverCarBindingModel(conn sqlx.SqlConn) DriverCarBindingModel {
 
 func (m *defaultDriverCarBindingModel) Insert(ctx context.Context, data *DriverCarBinding) (sql.Result, error) {
 	query := fmt.Sprintf(
-		"INSERT INTO %s (`id`,`driver_id`,`car_id`,`bind_state`,`binding_time`) VALUES (?,?,?,?,?)",
+		"INSERT INTO %s (`driver_id`,`car_id`,`bind_state`,`binding_time`) VALUES (?,?,?,?)",
 		m.table,
 	)
-	ret, err := m.conn.ExecCtx(ctx, query, data.Id, data.DriverId, data.CarId, data.BindState, data.BindingTime)
+	ret, err := m.conn.ExecCtx(ctx, query, data.DriverId, data.CarId, data.BindState, data.BindingTime)
 	return ret, err
 }
 
@@ -61,7 +61,7 @@ func (m *defaultDriverCarBindingModel) FindByDriverId(ctx context.Context, drive
 	err := m.conn.QueryRowCtx(ctx, &resp, query, driverId)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, nil
+			return nil, ErrNotFound
 		}
 		return nil, err
 	}

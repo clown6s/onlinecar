@@ -59,7 +59,7 @@ func (m *defaultDriverWorkStatusModel) FindByDriverId(ctx context.Context, drive
 	err := m.conn.QueryRowCtx(ctx, &resp, query, driverId)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, nil
+			return nil, ErrNotFound
 		}
 		return nil, err
 	}

@@ -3,12 +3,15 @@ package model
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
+
+var ErrNotFound = errors.New("record not found")
 
 var (
 	districtFieldNames = []string{
@@ -70,7 +73,7 @@ func (m *defaultDistrictModel) FindOne(ctx context.Context, id int64) (*District
 	err := m.conn.QueryRowCtx(ctx, &resp, query, id)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, nil
+			return nil, ErrNotFound
 		}
 		return nil, err
 	}
@@ -83,7 +86,7 @@ func (m *defaultDistrictModel) FindByAdCode(ctx context.Context, adCode uint32) 
 	err := m.conn.QueryRowCtx(ctx, &resp, query, adCode)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, nil
+			return nil, ErrNotFound
 		}
 		return nil, err
 	}

@@ -36,8 +36,11 @@ func (m *CORSMiddleware) Handle(next http.HandlerFunc) http.HandlerFunc {
 				w.Header().Set("Access-Control-Allow-Origin", resolvedOrigin)
 				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID")
-				w.Header().Set("Access-Control-Allow-Credentials", "true")
 				w.Header().Set("Access-Control-Max-Age", "86400")
+				// 通配符 * 时禁止 Credentials，避免任意网站带凭证跨域
+				if !m.isWildcard() {
+					w.Header().Set("Access-Control-Allow-Credentials", "true")
+				}
 			}
 		}
 
@@ -48,6 +51,15 @@ func (m *CORSMiddleware) Handle(next http.HandlerFunc) http.HandlerFunc {
 
 		next(w, r)
 	}
+}
+
+func (m *CORSMiddleware) isWildcard() bool {
+	for _, o := range m.allowOrigins {
+		if o == "*" {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *CORSMiddleware) resolveOrigin(origin string) string {

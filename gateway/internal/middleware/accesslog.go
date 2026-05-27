@@ -28,7 +28,7 @@ func (m *AccessLogMiddleware) Handle(next http.HandlerFunc) http.HandlerFunc {
 			logx.Infof("[ACCESS] method=%s path=%s status=%d duration=%v remote=%s request_id=%s",
 				r.Method, r.URL.Path, rw.statusCode, duration, r.RemoteAddr, rid)
 		} else {
-			logx.Slowf("[ACCESS] method=%s path=%s status=%d duration=%v remote=%s request_id=%s",
+			logx.Debugf("[ACCESS] method=%s path=%s status=%d duration=%v remote=%s request_id=%s",
 				r.Method, r.URL.Path, rw.statusCode, duration, r.RemoteAddr, rid)
 		}
 	}

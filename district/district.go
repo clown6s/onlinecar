@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"flag"
+	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"onlinecar-district/internal/config"
@@ -18,6 +20,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -55,10 +58,34 @@ func main() {
 			MinTime:             10 * time.Second,
 			PermitWithoutStream: false,
 		}),
-		// UnaryInterceptor：统一日志、panic recovery
+		// UnaryInterceptor：统一日志、panic recovery + 简单认证
 		grpc.UnaryInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+			// 简单认证：校验 x-internal-token
+			if !strings.HasSuffix(info.FullMethod, "/Health/Check") {
+				if expected := os.Getenv("ONLINECAR_INTERNAL_TOKEN"); expected != "" {
+					md, ok := metadata.FromIncomingContext(ctx)
+					if !ok {
+						return nil, status.Errorf(codes.Unauthenticated, "missing metadata")
+					}
+					tokens := md.Get("x-internal-token")
+					if len(tokens) == 0 || tokens[0] != expected {
+						return nil, status.Errorf(codes.Unauthenticated, "invalid internal token")
+					}
+				}
+			}
+
+			// panic recovery
+			var err error
+			defer func() {
+				if r := recover(); r != nil {
+					logx.Errorf("[gRPC] panic recovered in %s: %v", info.FullMethod, r)
+					err = status.Errorf(codes.Internal, "internal server error")
+				}
+			}()
+
 			startTime := time.Now()
-			resp, err := handler(ctx, req)
+			resp, handlerErr := handler(ctx, req)
+			err = handlerErr
 			duration := time.Since(startTime)
 
 			if err != nil {

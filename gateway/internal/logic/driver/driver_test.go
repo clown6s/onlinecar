@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"onlinecar-gateway/common/ctxdata"
+	"onlinecar-common/ctxdata"
 	"onlinecar-gateway/common/sms"
 	"onlinecar-gateway/internal/config"
 	"onlinecar-gateway/internal/svc"
@@ -20,6 +20,7 @@ type mockDriverClient struct {
 	registerFunc       func(ctx context.Context, in *driverpb.RegisterReq, opts ...grpc.CallOption) (*driverpb.RegisterResp, error)
 	loginFunc          func(ctx context.Context, in *driverpb.LoginReq, opts ...grpc.CallOption) (*driverpb.LoginResp, error)
 	updateLocationFunc func(ctx context.Context, in *driverpb.UpdateLocationReq, opts ...grpc.CallOption) (*driverpb.Empty, error)
+	checkPhoneFunc     func(ctx context.Context, in *driverpb.CheckPhoneReq, opts ...grpc.CallOption) (*driverpb.CheckPhoneResp, error)
 }
 
 func (m *mockDriverClient) Register(ctx context.Context, in *driverpb.RegisterReq, opts ...grpc.CallOption) (*driverpb.RegisterResp, error) {
@@ -56,6 +57,9 @@ func (m *mockDriverClient) UpdateDriverWorkStatus(ctx context.Context, in *drive
 }
 
 func (m *mockDriverClient) CheckPhone(ctx context.Context, in *driverpb.CheckPhoneReq, opts ...grpc.CallOption) (*driverpb.CheckPhoneResp, error) {
+	if m.checkPhoneFunc != nil {
+		return m.checkPhoneFunc(ctx, in, opts...)
+	}
 	return &driverpb.CheckPhoneResp{Exists: true}, nil
 }
 
@@ -76,6 +80,9 @@ func newTestSvcCtx(client driverpb.DriverClient) *svc.ServiceContext {
 func TestRegisterLogic_Success(t *testing.T) {
 	ctx := context.Background()
 	mockClient := &mockDriverClient{
+		checkPhoneFunc: func(ctx context.Context, in *driverpb.CheckPhoneReq, opts ...grpc.CallOption) (*driverpb.CheckPhoneResp, error) {
+			return &driverpb.CheckPhoneResp{Exists: false}, nil
+		},
 		registerFunc: func(ctx context.Context, in *driverpb.RegisterReq, opts ...grpc.CallOption) (*driverpb.RegisterResp, error) {
 			return &driverpb.RegisterResp{Id: 1, DriverName: "张三", DriverPhone: "13800000001", State: 0}, nil
 		},

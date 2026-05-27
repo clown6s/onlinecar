@@ -2,11 +2,12 @@ package middleware
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
-	"onlinecar-gateway/common/ctxdata"
-	"onlinecar-gateway/common/errorx"
+	"onlinecar-common/ctxdata"
+	"onlinecar-common/errorx"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -18,6 +19,9 @@ type JWTAuthMiddleware struct {
 }
 
 func NewJWTAuthMiddleware(secret string) *JWTAuthMiddleware {
+	if secret == "" {
+		logx.Must(fmt.Errorf("JWT secret must not be empty"))
+	}
 	return &JWTAuthMiddleware{Secret: secret}
 }
 

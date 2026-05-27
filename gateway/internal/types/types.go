@@ -33,15 +33,6 @@ type DriverResp struct {
 	WorkStatus     int64  `json:"workStatus"`
 }
 
-type DriverWorkStatusReq struct {
-	WorkStatus int64 `json:"workStatus"`
-}
-
-type DriverWorkStatusResp struct {
-	DriverId   int64 `json:"driverId"`
-	WorkStatus int64 `json:"workStatus"`
-}
-
 // ========== 乘客 ==========
 
 type PassengerRegisterReq struct {

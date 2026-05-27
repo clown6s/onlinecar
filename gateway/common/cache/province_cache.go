@@ -35,7 +35,12 @@ func NewProvinceCache(client districtpb.DistrictServiceClient, ttl time.Duration
 func (c *ProvinceCache) Get(_ context.Context) ([]*types.DistrictNodeResp, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.data, nil
+	if c.data == nil {
+		return []*types.DistrictNodeResp{}, nil
+	}
+	result := make([]*types.DistrictNodeResp, len(c.data))
+	copy(result, c.data)
+	return result, nil
 }
 
 // Start 启动后台异步刷新 goroutine

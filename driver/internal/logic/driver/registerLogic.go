@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"onlinecar-driver/common/errorx"
+	"onlinecar-common/errorx"
 	"onlinecar-driver/internal/model"
 	"onlinecar-driver/internal/svc"
 	"onlinecar-driver/pb"

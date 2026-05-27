@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// CodeError 统一业务错误类型
 type CodeError struct {
 	Code int    `json:"code"`
 	Msg  string `json:"msg"`
@@ -122,6 +123,8 @@ var (
 
 // MapRpcError 将 gRPC 传输过来的错误映射为 CodeError。
 // 跨 gRPC 传输后 CodeError 类型会丢失为普通 error，通过错误消息中的关键词匹配恢复业务错误码。
+//
+// TODO: 长期应改用 gRPC status code + metadata 传递业务错误码，而非字符串匹配
 func MapRpcError(err error) *CodeError {
 	if err == nil {
 		return nil
@@ -131,6 +134,16 @@ func MapRpcError(err error) *CodeError {
 	switch {
 	case strings.Contains(msg, "该手机号已注册"):
 		return ErrPhoneRegistered
+	case strings.Contains(msg, "车辆不存在"):
+		return ErrVehicleNotFound
+	case strings.Contains(msg, "司机不存在") || strings.Contains(msg, "用户不存在"):
+		return ErrUserNotFound
+	case strings.Contains(msg, "验证码错误"):
+		return ErrSmsCodeError
+	case strings.Contains(msg, "验证码已过期"):
+		return ErrSmsCodeExpired
+	case strings.Contains(msg, "发送过于频繁"):
+		return ErrSmsSendFrequent
 	case strings.Contains(msg, "不存在"):
 		return ErrUserNotFound
 	case strings.Contains(msg, "已禁用"):
@@ -149,6 +162,5 @@ func MapRpcError(err error) *CodeError {
 		return ErrDistrictNotFound
 	}
 
-	// 默认返回服务不可用（不暴露内部错误细节）
-	return ErrServiceUnavailable
+	return ErrServer
 }

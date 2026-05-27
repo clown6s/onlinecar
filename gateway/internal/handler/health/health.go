@@ -9,6 +9,7 @@ import (
 	"onlinecar-gateway/internal/svc"
 
 	"github.com/zeromicro/go-zero/core/logx"
+	"github.com/zeromicro/go-zero/core/stores/redis"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health/grpc_health_v1"
 )
@@ -36,18 +37,27 @@ func HealthHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			details["passenger_rpc"] = "unhealthy"
 		}
 
+		districtOk := checkGRPCHealth(svcCtx.DistrictConn, "district.rpc")
+		if districtOk {
+			details["district_rpc"] = "ok"
+		} else {
+			details["district_rpc"] = "unhealthy"
+		}
+
+		redisOk := checkRedisHealth(svcCtx.Redis)
+		if redisOk {
+			details["redis"] = "ok"
+		} else {
+			details["redis"] = "unhealthy"
+		}
+
 		status := "ok"
-		if !driverOk || !passengerOk {
+		if !driverOk || !passengerOk || !districtOk || !redisOk {
 			status = "degraded"
 		}
 
-		code := http.StatusOK
 		if status == "degraded" {
-			code = http.StatusServiceUnavailable
-		}
-
-		if status == "degraded" {
-			response.SuccessWithCode(w, code, HealthResponse{Status: status, Details: details})
+			response.Error(w, http.StatusServiceUnavailable, 50301, "service degraded")
 		} else {
 			response.Success(w, HealthResponse{Status: status, Details: details})
 		}
@@ -71,4 +81,16 @@ func checkGRPCHealth(conn *grpc.ClientConn, service string) bool {
 	}
 
 	return resp.GetStatus() == grpc_health_v1.HealthCheckResponse_SERVING
+}
+
+func checkRedisHealth(rdb *redis.Redis) bool {
+	if rdb == nil {
+		return false
+	}
+	ok := rdb.Ping()
+	if !ok {
+		logx.Errorf("redis health check failed")
+		return false
+	}
+	return true
 }

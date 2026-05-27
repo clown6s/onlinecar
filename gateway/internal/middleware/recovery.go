@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"runtime/debug"
 
-	"onlinecar-gateway/common/errorx"
+	"onlinecar-common/errorx"
 	"onlinecar-gateway/common/response"
 
 	"github.com/zeromicro/go-zero/core/logx"

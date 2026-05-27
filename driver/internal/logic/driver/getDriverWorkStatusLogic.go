@@ -2,7 +2,10 @@ package driverlogic
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
+	"onlinecar-driver/internal/model"
 	"onlinecar-driver/internal/svc"
 	"onlinecar-driver/pb"
 
@@ -29,14 +32,14 @@ func (l *GetDriverWorkStatusLogic) GetDriverWorkStatus(in *pb.GetDriverWorkStatu
 
 	workStatus, err := l.svcCtx.DriverWorkStatusModel.FindByDriverId(l.ctx, in.DriverId)
 	if err != nil {
+		if errors.Is(err, model.ErrNotFound) {
+			return &pb.DriverWorkStatusInfo{
+				DriverId:   in.DriverId,
+				WorkStatus: 0, // 默认收车
+			}, nil
+		}
 		l.Errorf("查询司机工作状态失败, driverId=%d, err=%v", in.DriverId, err)
-		return nil, err
-	}
-	if workStatus == nil || workStatus.WorkStatus == nil {
-		return &pb.DriverWorkStatusInfo{
-			DriverId:   in.DriverId,
-			WorkStatus: 0, // 默认收车
-		}, nil
+		return nil, fmt.Errorf("查询失败，请稍后重试")
 	}
 
 	return &pb.DriverWorkStatusInfo{

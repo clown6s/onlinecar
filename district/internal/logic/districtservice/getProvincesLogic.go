@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand/v2"
 	"time"
 
 	"onlinecar-district/internal/svc"
 	"onlinecar-district/pb"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/zeromicro/go-zero/core/logx"
+	"golang.org/x/sync/singleflight"
 )
 
 type GetProvincesLogic struct {
@@ -27,9 +30,19 @@ func NewGetProvincesLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetP
 }
 
 const (
-	districtCachePrefix = "district:list:"
-	districtCacheTTL    = 24 * time.Hour
+	districtCachePrefix  = "district:list:"
+	districtCacheBaseTTL = 24 * time.Hour
 )
+
+// sfGroup 用于缓存击穿防护，同一时刻只有一个 goroutine 查询 DB
+var sfGroup singleflight.Group
+
+// cacheTTL 返回带随机偏移的 TTL，防止缓存雪崩
+func cacheTTL() time.Duration {
+	// 基础 24h ± 随机 0~2h 偏移，防止雪崩
+	jitter := time.Duration(rand.IntN(7200)) * time.Second // 0~2h
+	return districtCacheBaseTTL + jitter - time.Hour       // 23~25h
+}
 
 // 获取省级行政区列表（带 Redis 缓存）
 func (l *GetProvincesLogic) GetProvinces(in *pb.GetProvincesReq) (*pb.GetProvincesResp, error) {
@@ -39,42 +52,62 @@ func (l *GetProvincesLogic) GetProvinces(in *pb.GetProvincesReq) (*pb.GetProvinc
 
 	// 1. 尝试读缓存
 	cached, err := l.svcCtx.Redis.Get(cacheKey)
+	if err != nil && err != redis.Nil {
+		l.Errorf("Redis 读取失败, key=%s, err=%v", cacheKey, err)
+	}
 	if err == nil && cached != "" {
 		var resp pb.GetProvincesResp
-		if jsonErr := json.Unmarshal([]byte(cached), &resp); jsonErr == nil {
+		if err = json.Unmarshal([]byte(cached), &resp); err == nil {
 			l.Infof("命中缓存, key=%s, count=%d", cacheKey, len(resp.List))
 			return &resp, nil
 		}
+		l.Errorf("缓存反序列化失败, key=%s, err=%v", cacheKey, err)
 	}
 
-	// 2. 缓存未命中，查数据库（省级 parent_adcode 为空）
-	list, err := l.svcCtx.DistrictModel.FindByParentAdCode(l.ctx, "")
-	if err != nil {
-		l.Errorf("查询省级行政区失败, err=%v", err)
-		return nil, err
-	}
-
-	resp := &pb.GetProvincesResp{}
-	for _, d := range list {
-		node := &pb.DistrictNode{
-			Id:     d.Id,
-			Name:   d.Name,
-			Level:  d.Level,
-			Center: d.Center,
+	// 2. 缓存未命中，使用 singleflight 防止击穿
+	v, sfErr, _ := sfGroup.Do(cacheKey, func() (interface{}, error) {
+		// double check：再次读缓存，可能其他 goroutine 已填充
+		if cached, err := l.svcCtx.Redis.Get(cacheKey); err == nil && cached != "" {
+			var resp pb.GetProvincesResp
+			if jsonErr := json.Unmarshal([]byte(cached), &resp); jsonErr == nil {
+				return &resp, nil
+			}
 		}
-		if d.AdCode != nil {
-			node.AdCode = *d.AdCode
+
+		// 查数据库（省级 parent_adcode 为空）
+		list, err := l.svcCtx.DistrictModel.FindByParentAdCode(l.ctx, "")
+		if err != nil {
+			l.Errorf("查询省级行政区失败, err=%v", err)
+			return nil, err
 		}
-		resp.List = append(resp.List, node)
+
+		resp := &pb.GetProvincesResp{}
+		for _, d := range list {
+			node := &pb.DistrictNode{
+				Id:     d.Id,
+				Name:   d.Name,
+				Level:  d.Level,
+				Center: d.Center,
+			}
+			if d.AdCode != nil {
+				node.AdCode = *d.AdCode
+			}
+			resp.List = append(resp.List, node)
+		}
+
+		// 写入缓存（失败不影响响应）
+		if data, marshalErr := json.Marshal(resp); marshalErr == nil {
+			if setErr := l.svcCtx.Redis.Setex(cacheKey, string(data), int(cacheTTL().Seconds())); setErr != nil {
+				l.Errorf("写入缓存失败, key=%s, err=%v", cacheKey, setErr)
+			}
+		}
+
+		return resp, nil
+	})
+	if sfErr != nil {
+		return nil, sfErr
 	}
 
-	// 3. 写入缓存（失败不影响响应）
-	if data, marshalErr := json.Marshal(resp); marshalErr == nil {
-		if setErr := l.svcCtx.Redis.Setex(cacheKey, string(data), int(districtCacheTTL.Seconds())); setErr != nil {
-			l.Errorf("写入缓存失败, key=%s, err=%v", cacheKey, setErr)
-		}
-	}
-
-	l.Infof("查询省级行政区成功, count=%d", len(resp.List))
-	return resp, nil
+	l.Infof("查询省级行政区成功, count=%d", v.(*pb.GetProvincesResp).List)
+	return v.(*pb.GetProvincesResp), nil
 }

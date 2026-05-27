@@ -3,7 +3,7 @@ package district
 import (
 	"net/http"
 
-	"onlinecar-gateway/common/errorx"
+	"onlinecar-common/errorx"
 	"onlinecar-gateway/common/response"
 	districtlogic "onlinecar-gateway/internal/logic/district"
 	"onlinecar-gateway/internal/svc"

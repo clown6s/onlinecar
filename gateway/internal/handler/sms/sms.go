@@ -3,7 +3,7 @@ package sms
 import (
 	"net/http"
 
-	"onlinecar-gateway/common/errorx"
+	"onlinecar-common/errorx"
 	"onlinecar-gateway/common/response"
 	"onlinecar-gateway/common/validate"
 	smslogic "onlinecar-gateway/internal/logic/sms"

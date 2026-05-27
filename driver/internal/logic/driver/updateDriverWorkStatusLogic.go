@@ -2,8 +2,10 @@ package driverlogic
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"onlinecar-driver/internal/model"
 	"onlinecar-driver/internal/svc"
 	"onlinecar-driver/pb"
 
@@ -33,10 +35,19 @@ func (l *UpdateDriverWorkStatusLogic) UpdateDriverWorkStatus(in *pb.UpdateDriver
 		return nil, fmt.Errorf("无效的工作状态，仅支持0(收车)/1(出车)/2(暂停)")
 	}
 
-	err := l.svcCtx.DriverWorkStatusModel.Upsert(l.ctx, in.DriverId, in.WorkStatus)
+	_, err := l.svcCtx.DriverUserModel.FindOne(l.ctx, in.DriverId)
+	if err != nil {
+		if errors.Is(err, model.ErrNotFound) {
+			return nil, fmt.Errorf("司机不存在")
+		}
+		l.Errorf("查询司机失败, driverId=%d, err=%v", in.DriverId, err)
+		return nil, fmt.Errorf("查询失败，请稍后重试")
+	}
+
+	err = l.svcCtx.DriverWorkStatusModel.Upsert(l.ctx, in.DriverId, in.WorkStatus)
 	if err != nil {
 		l.Errorf("更新司机工作状态失败, driverId=%d, err=%v", in.DriverId, err)
-		return nil, err
+		return nil, fmt.Errorf("更新失败，请稍后重试")
 	}
 
 	l.Infof("司机工作状态更新成功, driverId=%d, workStatus=%d", in.DriverId, in.WorkStatus)

@@ -52,7 +52,7 @@ type (
 		EngineId       *string    `db:"engine_id"`
 		Vin            *string    `db:"vin"`
 		CertifyDateA   *time.Time `db:"certify_date_a"`
-		FueType        *string    `db:"fue_type"`
+		FuelType       *string    `db:"fue_type"`
 		EngineDisplace *string    `db:"engine_displace"`
 		TransAgency    *string    `db:"trans_agency"`
 		TransArea      *string    `db:"trans_area"`
@@ -97,7 +97,7 @@ func (m *defaultCarModel) Insert(ctx context.Context, data *Car) (sql.Result, er
 	ret, err := m.conn.ExecCtx(ctx, query,
 		data.Address, data.VehicleNo, data.PlateColor, data.Seats, data.Brand,
 		data.Model, data.VehicleType, data.OwnerName, data.VehicleColor, data.EngineId,
-		data.Vin, data.CertifyDateA, data.FueType, data.EngineDisplace, data.TransAgency,
+		data.Vin, data.CertifyDateA, data.FuelType, data.EngineDisplace, data.TransAgency,
 		data.TransArea, data.TransDateStart, data.TransDateEnd, data.CertifyDateB, data.FixState,
 		data.NextFixDate, data.CheckState, data.FeePrintId, data.GpsBrand, data.GpsModel,
 		data.GpsInstallDate, data.RegisterDate, data.CommercialType, data.FareType, data.State,
@@ -112,7 +112,7 @@ func (m *defaultCarModel) FindOne(ctx context.Context, id int64) (*Car, error) {
 	err := m.conn.QueryRowCtx(ctx, &resp, query, id)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, nil
+			return nil, ErrNotFound
 		}
 		return nil, err
 	}
@@ -125,7 +125,7 @@ func (m *defaultCarModel) FindByVehicleNo(ctx context.Context, vehicleNo string)
 	err := m.conn.QueryRowCtx(ctx, &resp, query, vehicleNo)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, nil
+			return nil, ErrNotFound
 		}
 		return nil, err
 	}
@@ -143,7 +143,7 @@ func (m *defaultCarModel) Update(ctx context.Context, data *Car) error {
 	_, err := m.conn.ExecCtx(ctx, query,
 		data.Address, data.VehicleNo, data.PlateColor, data.Seats, data.Brand,
 		data.Model, data.VehicleType, data.OwnerName, data.VehicleColor, data.EngineId,
-		data.Vin, data.CertifyDateA, data.FueType, data.EngineDisplace, data.TransAgency,
+		data.Vin, data.CertifyDateA, data.FuelType, data.EngineDisplace, data.TransAgency,
 		data.TransArea, data.TransDateStart, data.TransDateEnd, data.CertifyDateB, data.FixState,
 		data.NextFixDate, data.CheckState, data.FeePrintId, data.GpsBrand, data.GpsModel,
 		data.GpsInstallDate, data.RegisterDate, data.CommercialType, data.FareType, data.State,
@@ -171,7 +171,7 @@ func (m *defaultCarModel) InsertWithConn(ctx context.Context, session sqlx.Sessi
 	ret, err := session.ExecCtx(ctx, query,
 		data.Address, data.VehicleNo, data.PlateColor, data.Seats, data.Brand,
 		data.Model, data.VehicleType, data.OwnerName, data.VehicleColor, data.EngineId,
-		data.Vin, data.CertifyDateA, data.FueType, data.EngineDisplace, data.TransAgency,
+		data.Vin, data.CertifyDateA, data.FuelType, data.EngineDisplace, data.TransAgency,
 		data.TransArea, data.TransDateStart, data.TransDateEnd, data.CertifyDateB, data.FixState,
 		data.NextFixDate, data.CheckState, data.FeePrintId, data.GpsBrand, data.GpsModel,
 		data.GpsInstallDate, data.RegisterDate, data.CommercialType, data.FareType, data.State,

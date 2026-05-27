@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log"
 	"net"
 	"net/http"
 	"strconv"
@@ -10,12 +11,22 @@ import (
 type SecurityHeadersMiddleware struct {
 	// TrustedProxySubnets 可信代理网段（CIDR），仅信任这些来源的 X-Forwarded-Proto
 	TrustedProxySubnets []string
+	trustedCIDRs        []*net.IPNet
 }
 
 func NewSecurityHeadersMiddleware(trustedProxySubnets ...string) *SecurityHeadersMiddleware {
-	return &SecurityHeadersMiddleware{
+	m := &SecurityHeadersMiddleware{
 		TrustedProxySubnets: trustedProxySubnets,
 	}
+	for _, cidr := range trustedProxySubnets {
+		_, network, err := net.ParseCIDR(cidr)
+		if err != nil {
+			log.Printf("[SECURITY] 解析可信代理网段失败, cidr=%s, err=%v", cidr, err)
+			continue
+		}
+		m.trustedCIDRs = append(m.trustedCIDRs, network)
+	}
+	return m
 }
 
 func (m *SecurityHeadersMiddleware) isTrustedProto(r *http.Request) bool {
@@ -24,7 +35,7 @@ func (m *SecurityHeadersMiddleware) isTrustedProto(r *http.Request) bool {
 		return true
 	}
 	// 2. 未配置可信代理，不信任代理头
-	if len(m.TrustedProxySubnets) == 0 {
+	if len(m.trustedCIDRs) == 0 {
 		return false
 	}
 	// 3. 仅当来源 IP 属于可信代理时，才信任 X-Forwarded-Proto
@@ -36,9 +47,8 @@ func (m *SecurityHeadersMiddleware) isTrustedProto(r *http.Request) bool {
 	if ip == nil {
 		return false
 	}
-	for _, cidr := range m.TrustedProxySubnets {
-		_, network, err := net.ParseCIDR(cidr)
-		if err == nil && network.Contains(ip) && r.Header.Get("X-Forwarded-Proto") == "https" {
+	for _, network := range m.trustedCIDRs {
+		if network.Contains(ip) && r.Header.Get("X-Forwarded-Proto") == "https" {
 			return true
 		}
 	}

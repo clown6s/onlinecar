@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"onlinecar-gateway/common/ctxdata"
-	"onlinecar-gateway/common/errorx"
+	"onlinecar-common/ctxdata"
+	"onlinecar-common/errorx"
 	"onlinecar-gateway/internal/logic/sms"
 	"onlinecar-gateway/internal/svc"
 	"onlinecar-gateway/internal/types"
@@ -69,7 +69,12 @@ func NewLoginLogic(ctx context.Context, svcCtx *svc.ServiceContext) *LoginLogic 
 	return &LoginLogic{Logger: logx.WithContext(ctx), ctx: ctx, svcCtx: svcCtx}
 }
 
-func (l *LoginLogic) Login(req *types.DriverLoginReq) (map[string]any, error) {
+type LoginResp struct {
+	Token     string `json:"token"`
+	ExpiresIn int64  `json:"expiresIn"`
+}
+
+func (l *LoginLogic) Login(req *types.DriverLoginReq) (*LoginResp, error) {
 	l.Infof("Gateway->DriverRpc.Login, phone=%s", req.Phone)
 
 	// 校验验证码
@@ -83,6 +88,9 @@ func (l *LoginLogic) Login(req *types.DriverLoginReq) (map[string]any, error) {
 	if err != nil {
 		l.Errorf("DriverRpc.Login 失败, phone=%s, err=%v", req.Phone, err)
 		return nil, errorx.MapRpcError(err)
+	}
+	if resp == nil {
+		return nil, errorx.ErrServer
 	}
 
 	conf := l.svcCtx.Config.AuthDriver
@@ -101,11 +109,9 @@ func (l *LoginLogic) Login(req *types.DriverLoginReq) (map[string]any, error) {
 	}
 
 	l.Infof("司机登录成功, driverId=%d, name=%s", resp.Id, resp.DriverName)
-	return map[string]any{
-		"token":      tokenStr,
-		"expire":     conf.AccessExpire.Seconds(),
-		"driverId":   resp.Id,
-		"driverName": resp.DriverName,
+	return &LoginResp{
+		Token:     tokenStr,
+		ExpiresIn: int64(conf.AccessExpire.Seconds()),
 	}, nil
 }
 

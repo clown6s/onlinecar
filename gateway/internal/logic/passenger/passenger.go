@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"onlinecar-gateway/common/errorx"
+	"onlinecar-common/errorx"
 	"onlinecar-gateway/internal/logic/sms"
 	"onlinecar-gateway/internal/svc"
 	"onlinecar-gateway/internal/types"
@@ -66,7 +66,12 @@ func NewLoginLogic(ctx context.Context, svcCtx *svc.ServiceContext) *LoginLogic 
 	return &LoginLogic{Logger: logx.WithContext(ctx), ctx: ctx, svcCtx: svcCtx}
 }
 
-func (l *LoginLogic) Login(req *types.PassengerLoginReq) (map[string]any, error) {
+type LoginResp struct {
+	Token     string `json:"token"`
+	ExpiresIn int64  `json:"expiresIn"`
+}
+
+func (l *LoginLogic) Login(req *types.PassengerLoginReq) (*LoginResp, error) {
 	l.Infof("Gateway->PassengerRpc.Login, phone=%s", req.Phone)
 
 	// 校验验证码
@@ -80,6 +85,9 @@ func (l *LoginLogic) Login(req *types.PassengerLoginReq) (map[string]any, error)
 	if err != nil {
 		l.Errorf("PassengerRpc.Login 失败, phone=%s, err=%v", req.Phone, err)
 		return nil, errorx.MapRpcError(err)
+	}
+	if resp == nil {
+		return nil, errorx.ErrServer
 	}
 
 	conf := l.svcCtx.Config.AuthPassenger
@@ -98,10 +106,8 @@ func (l *LoginLogic) Login(req *types.PassengerLoginReq) (map[string]any, error)
 	}
 
 	l.Infof("乘客登录成功, passengerId=%d, name=%s", resp.Id, resp.PassengerName)
-	return map[string]any{
-		"token":         tokenStr,
-		"expire":        conf.AccessExpire.Seconds(),
-		"passengerId":   resp.Id,
-		"passengerName": resp.PassengerName,
+	return &LoginResp{
+		Token:     tokenStr,
+		ExpiresIn: int64(conf.AccessExpire.Seconds()),
 	}, nil
 }

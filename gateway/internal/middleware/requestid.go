@@ -1,7 +1,10 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
+
+	"onlinecar-common/ctxdata"
 
 	"github.com/google/uuid"
 )
@@ -19,6 +22,7 @@ func (m *RequestIDMiddleware) Handle(next http.HandlerFunc) http.HandlerFunc {
 			requestID = uuid.New().String()
 		}
 		w.Header().Set("X-Request-ID", requestID)
-		next(w, r)
+		ctx := context.WithValue(r.Context(), ctxdata.RequestIDKey, requestID)
+		next(w, r.WithContext(ctx))
 	}
 }

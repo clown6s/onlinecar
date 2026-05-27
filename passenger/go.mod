@@ -6,7 +6,10 @@ require (
 	github.com/zeromicro/go-zero v1.10.1
 	google.golang.org/grpc v1.81.1
 	google.golang.org/protobuf v1.36.11
+	onlinecar-common v0.0.0
 )
+
+replace onlinecar-common => ../common
 
 require (
 	filippo.io/edwards25519 v1.1.1 // indirect

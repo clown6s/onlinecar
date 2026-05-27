@@ -2,15 +2,14 @@ package sms
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
-	"math/rand/v2"
+	"math/big"
 	"time"
 
-	"onlinecar-gateway/common/errorx"
+	"onlinecar-common/errorx"
 	"onlinecar-gateway/common/validate"
 	"onlinecar-gateway/internal/svc"
-	driverpb "onlinecar-gateway/pb/driver"
-	passengerpb "onlinecar-gateway/pb/passenger"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -20,7 +19,6 @@ const (
 	limitPrefix = "sms:limit:"
 	codeTTL     = 5 * time.Minute
 	limitTTL    = 60 * time.Second
-	codeLength  = 6
 )
 
 type SendSmsLogic struct {
@@ -43,7 +41,8 @@ func (l *SendSmsLogic) SendSms(phone string) error {
 	}
 
 	// 生成 6 位随机验证码
-	code := fmt.Sprintf("%0*d", codeLength, rand.IntN(1000000))
+	n, _ := rand.Int(rand.Reader, big.NewInt(1000000))
+	code := fmt.Sprintf("%06d", n.Int64())
 
 	// 存验证码到 Redis（带角色前缀）
 	codeKey := fmt.Sprintf("%s%s:%s", codePrefix, l.role, phone)
@@ -63,34 +62,11 @@ func (l *SendSmsLogic) SendSms(phone string) error {
 	// 发送短信
 	if err := l.svcCtx.SmsSender.Send(l.ctx, phone, code); err != nil {
 		l.Errorf("SmsSender.Send 失败, phone=%s, err=%v", phone, err)
+		_, _ = l.svcCtx.Redis.Del(codeKey)
 		return errorx.ErrSmsSendFailed
 	}
 
 	l.Infof("验证码发送成功, role=%s, phone=%s", l.role, phone)
-	return nil
-}
-
-func (l *SendSmsLogic) checkPhoneExists(phone string) error {
-	switch l.role {
-	case "driver":
-		resp, err := l.svcCtx.DriverRpc.CheckPhone(l.ctx, &driverpb.CheckPhoneReq{DriverPhone: phone})
-		if err != nil {
-			l.Errorf("DriverRpc.CheckPhone RPC异常, phone=%s, err=%v", phone, err)
-			return errorx.ErrServiceUnavailable
-		}
-		if !resp.Exists {
-			return errorx.ErrUserNotFound
-		}
-	case "passenger":
-		resp, err := l.svcCtx.PassengerRpc.CheckPhone(l.ctx, &passengerpb.CheckPhoneReq{PassengerPhone: phone})
-		if err != nil {
-			l.Errorf("PassengerRpc.CheckPhone RPC异常, phone=%s, err=%v", phone, err)
-			return errorx.ErrServiceUnavailable
-		}
-		if !resp.Exists {
-			return errorx.ErrUserNotFound
-		}
-	}
 	return nil
 }
 
