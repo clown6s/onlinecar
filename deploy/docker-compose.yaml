@@ -18,7 +18,7 @@ services:
     ports:
       - "2379:2379"
     volumes:
-      - etcd1_data:/bitnami/etcd
+      - etcd1_data:/etcd-data
     networks:
       - onlinecar
     healthcheck:
@@ -50,7 +50,7 @@ services:
       ETCD_INITIAL_CLUSTER: etcd1=http://etcd-1:2380,etcd2=http://etcd-2:2380,etcd3=http://etcd-3:2380
       ETCD_CLUSTER_STATE: new
     volumes:
-      - etcd2_data:/bitnami/etcd
+      - etcd2_data:/etcd-data
     networks:
       - onlinecar
     healthcheck:
@@ -82,7 +82,7 @@ services:
       ETCD_INITIAL_CLUSTER: etcd1=http://etcd-1:2380,etcd2=http://etcd-2:2380,etcd3=http://etcd-3:2380
       ETCD_CLUSTER_STATE: new
     volumes:
-      - etcd3_data:/bitnami/etcd
+      - etcd3_data:/etcd-data
     networks:
       - onlinecar
     healthcheck:
@@ -175,7 +175,10 @@ services:
   # Jaeger 链路追踪 v2
   jaeger:
     image: jaegertracing/jaeger:2.3.0
-    command: --config=/etc/jaeger/jaeger.yaml
+    container_name: onlinecar-jaeger
+    restart: unless-stopped
+    user: "0:0"
+    command: --config=/etc/jaeger/config.yaml
     ports:
       - "16686:16686"   # Jaeger UI
     # OTLP 端口仅容器内访问
@@ -183,11 +186,12 @@ services:
     #   - "4317:4317"
     #   - "4318:4318"
     volumes:
-      - ./config/jaeger-config.yaml:/etc/jaeger/jaeger.yaml:ro
+      - ./config/jaeger-config.yaml:/etc/jaeger/config.yaml:ro
+      - jaeger_data:/var/lib/jaeger
     networks:
       - onlinecar
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:13133"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:13133/"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -418,6 +422,7 @@ volumes:
   mysql_data:
   redis_data:
   loki_data:
+  jaeger_data:
   onlinecar_logs:
   promtail_positions:
 

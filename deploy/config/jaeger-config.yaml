@@ -1,28 +1,46 @@
+# Jaeger v2 配置 — OnlineCar 生产部署
+# OTLP gRPC: 4317 | OTLP HTTP: 4318 | UI: 16686
+
 service:
-  extensions:
-    - health_check_v2:
-        endpoint: "0.0.0.0:13133"
-        check_host: true
+  extensions: [jaeger_storage, jaeger_query, healthcheckv2]
   pipelines:
     traces:
-      receivers:
-        - otlp:
-            protocols:
-              grpc:
-                endpoint: "0.0.0.0:4317"
-              http:
-                endpoint: "0.0.0.0:4318"
-      processors:
-        - batch:
-            timeout: 5s
-            send_batch_size: 1024
-      exporters:
-        - jaeger_storage:
-            trace_storage:
-              memory:
-                max_traces: 100000
-  telemetry:
-    logs:
-      level: info
-      output_paths:
-        - stdout
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [jaeger_storage_exporter]
+
+extensions:
+  healthcheckv2:
+    endpoint: 0.0.0.0:13133
+
+  jaeger_query:
+    storage:
+      traces: main
+  jaeger_storage:
+    backends:
+      main:
+        badger:
+          directories:
+            keys: "/var/lib/jaeger/badger/key"
+            values: "/var/lib/jaeger/badger/value"
+          ephemeral: false
+          ttl:
+            spans: 48h
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "0.0.0.0:4317"
+      http:
+        endpoint: "0.0.0.0:4318"
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+
+exporters:
+  jaeger_storage_exporter:
+    trace_storage: main
