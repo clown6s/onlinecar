@@ -31,6 +31,12 @@ PassengerRpc:
       - etcd-3:2379
     Key: passenger.rpc
 
+# Redis（短信验证码存储）
+RedisConf:
+  Host: redis:6379
+  Pass: "OnlineCar@2026#Redis"
+  Type: node
+
 # 日志（file 模式，Promtail 采集）
 Log:
   ServiceName: gateway-api
