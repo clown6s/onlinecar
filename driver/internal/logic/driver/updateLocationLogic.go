@@ -34,18 +34,31 @@ func (l *UpdateLocationLogic) UpdateLocation(in *pb.UpdateLocationReq) (*pb.Empt
 	}
 
 	key := "driver:location"
+	lastUpdateKey := "driver:last_update"
 	member := fmt.Sprintf("%d", in.Id)
-	// 原子操作：GEOADD + EXPIRE（司机超过 24h 未更新位置则自动清理）
-	// EXPIRE 作用于整个 key，每次有司机更新位置都会刷新 TTL
+
+	if l.svcCtx.Redis == nil {
+		l.Errorf("Redis 未配置, driverId=%d", in.Id)
+		return nil, fmt.Errorf("更新位置失败")
+	}
+
+	// GEOADD 写入位置，使用 HSET 记录每个司机的最后更新时间戳
+	// 不再使用全局 EXPIRE，改由后台 goroutine 根据 driver:last_update 清理过期数据
 	script := `
 redis.call('GEOADD', KEYS[1], ARGV[1], ARGV[2], ARGV[3])
-redis.call('EXPIRE', KEYS[1], ARGV[4])
+redis.call('HSET', KEYS[2], ARGV[3], ARGV[4])
 return 1
 `
-	driverLocationTTL := int((24 * time.Hour).Seconds())
-	_, err := l.svcCtx.Redis.Eval(script, []string{key}, in.Lng, in.Lat, member, driverLocationTTL)
+	// 不再使用全局 EXPIRE，改用 HSET 记录每个司机最后更新时间戳
+	// 后台 goroutine 根据 driver:last_update 中的时间戳清理过期数据（24h 阈值）
+	now := time.Now().Unix()
+	result, err := l.svcCtx.Redis.Eval(script, []string{key, lastUpdateKey}, in.Lng, in.Lat, member, now)
 	if err != nil {
 		l.Errorf("Redis GEOADD 失败, driverId=%d, err=%v", in.Id, err)
+		return nil, fmt.Errorf("更新位置失败")
+	}
+	if result == nil || result.(int64) != 1 {
+		l.Errorf("更新司机位置返回异常: driverId=%d, result=%v", in.Id, result)
 		return nil, fmt.Errorf("更新位置失败")
 	}
 

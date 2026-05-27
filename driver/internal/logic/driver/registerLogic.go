@@ -3,7 +3,9 @@ package driverlogic
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"time"
+	"unicode/utf8"
 
 	"onlinecar-common/errorx"
 	"onlinecar-driver/internal/model"
@@ -31,6 +33,17 @@ func NewRegisterLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Register
 // 注册司机（事务：检查手机号 + 插入司机 + 车辆 + 绑定关系）
 func (l *RegisterLogic) Register(in *pb.RegisterReq) (*pb.RegisterResp, error) {
 	l.Infof("司机注册, phone=%s, name=%s", in.DriverPhone, in.DriverName)
+
+	// 手机号格式校验
+	matched, _ := regexp.MatchString(`^1[3-9]\d{9}$`, in.DriverPhone)
+	if !matched {
+		return nil, errorx.ErrPhoneFormat
+	}
+
+	// 姓名长度校验
+	if utf8.RuneCountInString(in.DriverName) < 2 || utf8.RuneCountInString(in.DriverName) > 20 {
+		return nil, errorx.NewCodeError(400, "姓名长度应在2-20个字符之间")
+	}
 
 	commercialType := in.CommercialType
 	if commercialType <= 0 {
@@ -103,8 +116,13 @@ func (l *RegisterLogic) Register(in *pb.RegisterReq) (*pb.RegisterResp, error) {
 		return nil
 	})
 	if err != nil {
+		// 已知的业务错误直接返回
+		if codeErr, ok := err.(*errorx.CodeError); ok {
+			return nil, codeErr
+		}
+		// 系统错误返回通用信息，记录详细日志
 		l.Errorf("司机注册事务失败, phone=%s, err=%v", in.DriverPhone, err)
-		return nil, err
+		return nil, errorx.ErrServer
 	}
 
 	l.Infof("司机注册成功, driverId=%d", driverId)

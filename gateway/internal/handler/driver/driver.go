@@ -4,6 +4,7 @@ import (
 	"math"
 	"net/http"
 	"regexp"
+	"unicode/utf8"
 
 	"onlinecar-common/errorx"
 	"onlinecar-gateway/common/response"
@@ -28,7 +29,7 @@ func RegisterHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			response.Errorx(w, errorx.ErrPhoneFormat)
 			return
 		}
-		if len(req.Name) < 2 || len(req.Name) > 20 {
+		if nameLen := utf8.RuneCountInString(req.Name); nameLen < 2 || nameLen > 20 {
 			response.Error(w, http.StatusBadRequest, errorx.ErrCodeParam, "姓名长度须为2-20个字符")
 			return
 		}

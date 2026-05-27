@@ -291,6 +291,7 @@ func (m *defaultDriverUserModel) FindDriverDetail(ctx context.Context, driverId 
 		c.gmt_create AS c_gmt_create, c.gmt_modified AS c_gmt_modified
 	FROM ` + m.table + ` du
 	LEFT JOIN ` + "`driver_car_binding_relationship`" + ` dcb ON dcb.driver_id = du.id AND dcb.bind_state = 1
+		AND dcb.id = (SELECT MAX(dcb2.id) FROM driver_car_binding_relationship dcb2 WHERE dcb2.driver_id = du.id AND dcb2.bind_state = 1)
 	LEFT JOIN ` + "`car`" + ` c ON c.id = dcb.car_id
 	WHERE du.id = ?`
 

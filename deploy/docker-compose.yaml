@@ -194,6 +194,7 @@ services:
     image: jaegertracing/jaeger:2.3.0
     container_name: onlinecar-jaeger
     restart: unless-stopped
+    # TODO: Jaeger 当前以 root 运行，生产环境应配置非 root 用户
     user: "0:0"
     command: --config=/etc/jaeger/config.yaml
     ports:

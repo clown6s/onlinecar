@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -72,7 +73,7 @@ func (m *defaultPassengerUserModel) FindOne(ctx context.Context, id int64) (*Pas
 	var resp PassengerUser
 	err := m.conn.QueryRowCtx(ctx, &resp, query, id)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
@@ -85,7 +86,7 @@ func (m *defaultPassengerUserModel) FindByPhone(ctx context.Context, phone strin
 	var resp PassengerUser
 	err := m.conn.QueryRowCtx(ctx, &resp, query, phone)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
@@ -136,7 +137,7 @@ func (m *defaultPassengerUserModel) FindByPhoneWithConn(ctx context.Context, ses
 	var resp PassengerUser
 	err := session.QueryRowCtx(ctx, &resp, query, phone)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err

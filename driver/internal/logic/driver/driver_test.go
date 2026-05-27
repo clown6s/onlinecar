@@ -246,20 +246,17 @@ func TestGetDriverLogic_NotFound(t *testing.T) {
 
 // ========== UpdateLocationLogic Tests ==========
 
-func TestUpdateLocationLogic_Success(t *testing.T) {
+func TestUpdateLocationLogic_NilRedis(t *testing.T) {
 	ctx := context.Background()
-	svcCtx := &svc.ServiceContext{}
+	svcCtx := &svc.ServiceContext{} // Redis 为 nil
 	logic := NewUpdateLocationLogic(ctx, svcCtx)
 
-	resp, err := logic.UpdateLocation(&pb.UpdateLocationReq{
+	_, err := logic.UpdateLocation(&pb.UpdateLocationReq{
 		Id:  1,
 		Lng: 116.397428,
 		Lat: 39.90923,
 	})
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
-	}
-	if resp == nil {
-		t.Fatal("expected non-nil response")
+	if err == nil {
+		t.Fatal("expected error when Redis is nil")
 	}
 }

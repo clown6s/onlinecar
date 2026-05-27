@@ -25,7 +25,8 @@ type (
 		Insert(ctx context.Context, data *District) (sql.Result, error)
 		FindOne(ctx context.Context, id int64) (*District, error)
 		FindByAdCode(ctx context.Context, adCode uint32) (*District, error)
-		FindByParentAdCode(ctx context.Context, parentAdCode string) ([]*District, error)
+		FindByParentAdCode(ctx context.Context, parentAdCode uint32) ([]*District, error)
+		FindProvinces(ctx context.Context) ([]*District, error)
 		Update(ctx context.Context, data *District) error
 		Delete(ctx context.Context, id int64) error
 	}
@@ -93,22 +94,22 @@ func (m *defaultDistrictModel) FindByAdCode(ctx context.Context, adCode uint32) 
 	return &resp, nil
 }
 
-// FindByParentAdCode 查询子级行政区，parentAdCode 为空字符串时查省级（parent_adcode IS NULL 或 0）
-func (m *defaultDistrictModel) FindByParentAdCode(ctx context.Context, parentAdCode string) ([]*District, error) {
-	var query string
-	if parentAdCode == "" {
-		// 省级：parent_adcode 为 NULL 或 0
-		query = fmt.Sprintf("SELECT %s FROM %s WHERE (`parent_adcode` IS NULL OR `parent_adcode` = 0) ORDER BY `ad_code` ASC", strings.Join(districtFieldNames, ","), m.table)
-	} else {
-		query = fmt.Sprintf("SELECT %s FROM %s WHERE `parent_adcode` = ? ORDER BY `ad_code` ASC", strings.Join(districtFieldNames, ","), m.table)
-		var resp []*District
-		err := m.conn.QueryRowsCtx(ctx, &resp, query, parentAdCode)
-		if err != nil {
-			return nil, err
-		}
-		return resp, nil
+// FindByParentAdCode 查询子级行政区
+func (m *defaultDistrictModel) FindByParentAdCode(ctx context.Context, parentAdCode uint32) ([]*District, error) {
+	query := fmt.Sprintf("SELECT %s FROM %s WHERE `parent_adcode` = ? ORDER BY `ad_code` LIMIT 1000", strings.Join(districtFieldNames, ","), m.table)
+	var resp []*District
+	err := m.conn.QueryRowsCtx(ctx, &resp, query, parentAdCode)
+	if err != nil {
+		return nil, err
 	}
+	return resp, nil
+}
 
+// FindProvinces 查询省级行政区
+// 注意：确保所有省级数据的 parent_adcode 统一为 0（非 NULL）
+// 如果存在 NULL 值，需先执行: UPDATE district SET parent_adcode = 0 WHERE parent_adcode IS NULL AND level = 0
+func (m *defaultDistrictModel) FindProvinces(ctx context.Context) ([]*District, error) {
+	query := fmt.Sprintf("SELECT %s FROM %s WHERE `parent_adcode` = 0 ORDER BY `ad_code` ASC", strings.Join(districtFieldNames, ","), m.table)
 	var resp []*District
 	err := m.conn.QueryRowsCtx(ctx, &resp, query)
 	if err != nil {

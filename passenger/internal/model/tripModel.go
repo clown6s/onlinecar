@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -96,7 +97,7 @@ func (m *defaultTripModel) FindOne(ctx context.Context, id int64) (*Trip, error)
 	var resp Trip
 	err := m.conn.QueryRowCtx(ctx, &resp, query, id)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err

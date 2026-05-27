@@ -15,10 +15,13 @@ import (
 )
 
 const (
-	codePrefix  = "sms:code:"
-	limitPrefix = "sms:limit:"
-	codeTTL     = 5 * time.Minute
-	limitTTL    = 60 * time.Second
+	codePrefix        = "sms:code:"
+	limitPrefix       = "sms:limit:"
+	verifyPrefix      = "sms:verify:"
+	codeTTL           = 5 * time.Minute
+	limitTTL          = 60 * time.Second
+	verifyTTL         = 5 * time.Minute
+	maxVerifyAttempts = 5
 )
 
 type SendSmsLogic struct {
@@ -33,12 +36,20 @@ func NewSendSmsLogic(ctx context.Context, svcCtx *svc.ServiceContext, role strin
 }
 
 func (l *SendSmsLogic) SendSms(phone string) error {
-	// 频率限制检查
+	// 频率限制检查（原子操作，避免 TOCTOU 竞态）
 	limitKey := fmt.Sprintf("%s%s:%s", limitPrefix, l.role, phone)
-	limitVal, err := l.svcCtx.Redis.Get(limitKey)
-	if err == nil && limitVal != "" {
-		return errorx.ErrSmsSendFrequent
+	ok, err := l.svcCtx.Redis.SetnxEx(limitKey, "1", int(limitTTL.Seconds()))
+	if err != nil {
+		l.Errorf("Redis.SetnxEx 失败, key=%s, err=%v", limitKey, err)
+		return errorx.ErrSmsSendFailed
 	}
+	if !ok {
+		return errorx.NewCodeError(errorx.ErrCodeSmsSendFrequent, "发送过于频繁，请60秒后再试")
+	}
+
+	// 发送新验证码时删除旧的 verify 计数 key，防止旧验证码继续试
+	verifyKey := fmt.Sprintf("%s%s:%s", verifyPrefix, l.role, phone)
+	_, _ = l.svcCtx.Redis.Del(verifyKey)
 
 	// 生成 6 位随机验证码
 	n, _ := rand.Int(rand.Reader, big.NewInt(1000000))
@@ -52,17 +63,13 @@ func (l *SendSmsLogic) SendSms(phone string) error {
 	}
 
 	// 设频率限制
-	if err := l.svcCtx.Redis.Setex(limitKey, "1", int(limitTTL.Seconds())); err != nil {
-		l.Errorf("Redis.Setex 频率限制失败, key=%s, err=%v", limitKey, err)
-		// 频率限制写入失败时回滚验证码，防止限流失效
-		_, _ = l.svcCtx.Redis.Del(codeKey)
-		return errorx.ErrSmsSendFailed
-	}
+	// Setnx 已在上面原子设置，此处无需再次 Setex
 
 	// 发送短信
 	if err := l.svcCtx.SmsSender.Send(l.ctx, phone, code); err != nil {
 		l.Errorf("SmsSender.Send 失败, phone=%s, err=%v", phone, err)
 		_, _ = l.svcCtx.Redis.Del(codeKey)
+		_, _ = l.svcCtx.Redis.Del(limitKey) // 回滚限流 key，允许用户重试
 		return errorx.ErrSmsSendFailed
 	}
 
@@ -92,6 +99,17 @@ func VerifyCode(ctx context.Context, svcCtx *svc.ServiceContext, role, phone, co
 		return errorx.ErrParam
 	}
 
+	// 暴力破解防护：检查验证失败次数
+	verifyKey := fmt.Sprintf("%s%s:%s", verifyPrefix, role, phone)
+	verifyCount, err := svcCtx.Redis.Get(verifyKey)
+	if err == nil && verifyCount != "" {
+		var count int
+		fmt.Sscanf(verifyCount, "%d", &count)
+		if count >= maxVerifyAttempts {
+			return errorx.NewCodeError(errorx.ErrCodeSmsCodeError+900, "验证码错误次数过多，请稍后再试")
+		}
+	}
+
 	codeKey := fmt.Sprintf("%s%s:%s", codePrefix, role, phone)
 
 	result, err := svcCtx.Redis.Eval(verifyCodeScript, []string{codeKey}, code)
@@ -107,8 +125,11 @@ func VerifyCode(ctx context.Context, svcCtx *svc.ServiceContext, role, phone, co
 		case -1:
 			return errorx.ErrSmsCodeExpired
 		case 0:
+			svcCtx.Redis.Incr(verifyKey)
+			svcCtx.Redis.Expire(verifyKey, int(verifyTTL.Seconds()))
 			return errorx.ErrSmsCodeError
 		case 1:
+			svcCtx.Redis.Del(verifyKey)
 			return nil
 		}
 	case string:
@@ -117,8 +138,11 @@ func VerifyCode(ctx context.Context, svcCtx *svc.ServiceContext, role, phone, co
 		case "-1":
 			return errorx.ErrSmsCodeExpired
 		case "0":
+			svcCtx.Redis.Incr(verifyKey)
+			svcCtx.Redis.Expire(verifyKey, int(verifyTTL.Seconds()))
 			return errorx.ErrSmsCodeError
 		case "1":
+			svcCtx.Redis.Del(verifyKey)
 			return nil
 		}
 	}

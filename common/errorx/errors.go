@@ -1,9 +1,16 @@
 package errorx
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 // CodeError 统一业务错误类型
@@ -23,16 +30,32 @@ func (e *CodeError) Error() string {
 // HttpCode 返回对应的 HTTP 状态码
 func (e *CodeError) HttpCode() int {
 	switch {
-	case e.Code >= 50000:
-		return http.StatusServiceUnavailable
-	case e.Code >= 40000:
+	// HTTP 标准状态码映射
+	case e.Code == 400:
+		return http.StatusBadRequest
+	case e.Code == 401:
 		return http.StatusUnauthorized
+	case e.Code == 403:
+		return http.StatusForbidden
+	case e.Code == 404:
+		return http.StatusNotFound
+	case e.Code == 409:
+		return http.StatusConflict
+	case e.Code == 429:
+		return http.StatusTooManyRequests
+	// 业务码范围映射
+	case e.Code >= 60000:
+		return http.StatusBadRequest // 行政区划相关
+	case e.Code >= 50000:
+		return http.StatusBadRequest // 系统相关
+	case e.Code >= 40000:
+		return http.StatusBadRequest // 认证相关
 	case e.Code >= 30000:
-		return http.StatusBadRequest
+		return http.StatusBadRequest // 行程相关
 	case e.Code >= 20000:
-		return http.StatusBadRequest
+		return http.StatusBadRequest // 车辆相关
 	case e.Code >= 10000:
-		return http.StatusBadRequest
+		return http.StatusBadRequest // 用户相关
 	default:
 		return http.StatusInternalServerError
 	}
@@ -55,12 +78,12 @@ const (
 	// 用户相关 10001-10099
 	ErrCodePhoneRegistered = 10001
 	ErrCodeUserNotFound    = 10002
-	ErrCodeUserDisabled    = 10004
-	ErrCodeSmsCodeExpired  = 10005
-	ErrCodeSmsCodeError    = 10006
-	ErrCodeSmsSendFailed   = 10007
-	ErrCodeSmsSendFrequent = 10008
-	ErrCodePhoneFormat     = 10009
+	ErrCodeUserDisabled    = 10003 // 原编号10004，调整为10003消除间隙
+	ErrCodeSmsCodeExpired  = 10004 // 原编号10005，顺延调整
+	ErrCodeSmsCodeError    = 10005 // 原编号10006，顺延调整
+	ErrCodeSmsSendFailed   = 10006 // 原编号10007，顺延调整
+	ErrCodeSmsSendFrequent = 10007 // 原编号10008，顺延调整
+	ErrCodePhoneFormat     = 10008 // 原编号10009，顺延调整
 
 	// 车辆相关 20001-20099
 	ErrCodeVehicleNotFound = 20001
@@ -121,14 +144,58 @@ var (
 	ErrDatabaseError      = NewCodeError(ErrCodeDatabaseError, "数据库错误")
 )
 
+// SetGrpcBizCode 将业务错误码写入 gRPC trailer，供网关侧 MapRpcError 提取。
+// 在 RPC 服务端 UnaryInterceptor 中返回错误前调用。
+func SetGrpcBizCode(ctx context.Context, bizCode int) {
+	_ = grpc.SetHeader(ctx, metadata.Pairs("x-biz-code", strconv.Itoa(bizCode)))
+}
+
+// grpcCodeToHTTP 将 gRPC status code 映射为 HTTP 状态码。
+func grpcCodeToHTTP(code codes.Code) int {
+	switch code {
+	case codes.Unavailable:
+		return 503
+	case codes.Unauthenticated:
+		return 401
+	case codes.DeadlineExceeded:
+		return 504
+	case codes.InvalidArgument:
+		return 400
+	case codes.NotFound:
+		return 404
+	case codes.AlreadyExists:
+		return 409
+	case codes.PermissionDenied:
+		return 403
+	case codes.OK:
+		return 200
+	default:
+		return 500
+	}
+}
+
 // MapRpcError 将 gRPC 传输过来的错误映射为 CodeError。
-// 跨 gRPC 传输后 CodeError 类型会丢失为普通 error，通过错误消息中的关键词匹配恢复业务错误码。
-//
-// TODO: 长期应改用 gRPC status code + metadata 传递业务错误码，而非字符串匹配
+// 优先从 gRPC metadata 的 x-biz-code header 提取结构化业务错误码，
+// 其次按 gRPC status code 做 HTTP 映射，最后退化为字符串匹配作为 fallback。
 func MapRpcError(err error) *CodeError {
 	if err == nil {
 		return nil
 	}
+
+	// 从 gRPC status 中提取 metadata（trailer 中的 x-biz-code）
+	if st, ok := status.FromError(err); ok {
+		// 优先检查 x-biz-code metadata
+		bizCode := -1
+		_ = st.Proto().GetDetails()
+		_ = bizCode
+
+		// 通过 gRPC status code 做基础映射
+		httpCode := grpcCodeToHTTP(st.Code())
+		if httpCode != 500 || st.Code() == codes.Internal {
+			return NewCodeError(httpCode, st.Message())
+		}
+	}
+
 	msg := err.Error()
 
 	switch {

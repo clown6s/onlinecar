@@ -2,6 +2,7 @@ package driver
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"onlinecar-common/ctxdata"
@@ -12,6 +13,7 @@ import (
 	driverpb "onlinecar-gateway/pb/driver"
 
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/google/uuid"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -28,16 +30,7 @@ func NewRegisterLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Register
 func (l *RegisterLogic) Register(req *types.DriverRegisterReq) (*types.DriverResp, error) {
 	l.Infof("Gateway->DriverRpc.Register, phone=%s, name=%s", req.Phone, req.Name)
 
-	// 先检查手机号是否已注册
-	checkResp, err := l.svcCtx.DriverRpc.CheckPhone(l.ctx, &driverpb.CheckPhoneReq{DriverPhone: req.Phone})
-	if err != nil {
-		l.Errorf("DriverRpc.CheckPhone RPC异常, phone=%s, err=%v", req.Phone, err)
-		return nil, errorx.ErrServiceUnavailable
-	}
-	if checkResp.Exists {
-		return nil, errorx.ErrPhoneRegistered
-	}
-
+	// 直接调用 Register RPC，由 RPC 服务端数据库 UNIQUE 约束保证手机号唯一性
 	resp, err := l.svcCtx.DriverRpc.Register(l.ctx, &driverpb.RegisterReq{
 		DriverName:     req.Name,
 		DriverPhone:    req.Phone,
@@ -95,11 +88,15 @@ func (l *LoginLogic) Login(req *types.DriverLoginReq) (*LoginResp, error) {
 
 	conf := l.svcCtx.Config.AuthDriver
 	secret := conf.GetAccessSecret("ONLINECAR_DRIVER_JWT_SECRET")
+	now := time.Now()
 	claims := jwt.MapClaims{
-		"uid":     resp.Id,
-		"subject": "driver",
-		"exp":     time.Now().Add(conf.AccessExpire).Unix(),
-		"iat":     time.Now().Unix(),
+		"sub":  fmt.Sprintf("driver:%d", resp.Id),
+		"jti":  uuid.New().String(),
+		"uid":  resp.Id,
+		"role": "driver",
+		"exp":  now.Add(conf.AccessExpire).Unix(),
+		"iat":  now.Unix(),
+		"nbf":  now.Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenStr, err := token.SignedString([]byte(secret))

@@ -3,6 +3,8 @@ package passengerlogic
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"unicode/utf8"
 
 	"onlinecar-common/errorx"
 	"onlinecar-passenger/internal/model"
@@ -12,6 +14,8 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
+
+var phoneRegex = regexp.MustCompile(`^1[3-9]\d{9}$`)
 
 type RegisterLogic struct {
 	ctx    context.Context
@@ -30,6 +34,17 @@ func NewRegisterLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Register
 // 注册乘客（事务：检查手机号 + 插入乘客）
 func (l *RegisterLogic) Register(in *pb.RegisterReq) (*pb.RegisterResp, error) {
 	l.Infof("乘客注册, phone=%s, name=%s", in.PassengerPhone, in.PassengerName)
+
+	// 输入校验
+	if !phoneRegex.MatchString(in.PassengerPhone) {
+		return nil, errorx.ErrPhoneFormat
+	}
+	if utf8.RuneCountInString(in.PassengerName) < 2 || utf8.RuneCountInString(in.PassengerName) > 20 {
+		return nil, errorx.NewCodeError(errorx.ErrCodeParam, "姓名长度需在2-20个字符之间")
+	}
+	if in.PassengerGender < 0 || in.PassengerGender > 2 {
+		return nil, errorx.NewCodeError(errorx.ErrCodeParam, "性别参数无效")
+	}
 
 	state := int8(0) // 有效
 	gender := int8(in.PassengerGender)
@@ -65,8 +80,11 @@ func (l *RegisterLogic) Register(in *pb.RegisterReq) (*pb.RegisterResp, error) {
 		return nil
 	})
 	if err != nil {
-		l.Errorf("乘客注册事务失败, phone=%s, err=%v", in.PassengerPhone, err)
-		return nil, err
+		if codeErr, ok := err.(*errorx.CodeError); ok {
+			return nil, codeErr
+		}
+		logx.Errorf("乘客注册事务失败, phone=%s, err=%v", in.PassengerPhone, err)
+		return nil, errorx.ErrServer
 	}
 
 	l.Infof("乘客注册成功, passengerId=%d", passengerId)

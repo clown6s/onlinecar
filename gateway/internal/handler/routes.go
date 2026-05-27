@@ -23,9 +23,10 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 	server.Use(middleware.NewCORSMiddleware(svcCtx.Config.CORS.AllowOrigins...).Handle)
 	server.Use(middleware.NewSecurityHeadersMiddleware("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16").Handle)
 
-	// 健康检查（无需认证、无限流）
+	// 健康检查（无需认证，宽松限流 10 req/s per IP）
+	healthRateLimit := middleware.NewRateLimitMiddleware(10).Handle
 	server.AddRoutes([]rest.Route{
-		{Method: http.MethodGet, Path: "/healthz", Handler: healthhandler.HealthHandler(svcCtx)},
+		{Method: http.MethodGet, Path: "/healthz", Handler: healthRateLimit(healthhandler.HealthHandler(svcCtx))},
 	})
 
 	// 公开路由：不需要 JWT，带限流（20 req/s per IP）

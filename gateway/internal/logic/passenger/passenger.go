@@ -2,6 +2,7 @@ package passenger
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"onlinecar-common/errorx"
@@ -11,6 +12,7 @@ import (
 	passengerpb "onlinecar-gateway/pb/passenger"
 
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/google/uuid"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -27,16 +29,7 @@ func NewRegisterLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Register
 func (l *RegisterLogic) Register(req *types.PassengerRegisterReq) (*types.PassengerResp, error) {
 	l.Infof("Gateway->PassengerRpc.Register, phone=%s, name=%s", req.Phone, req.Name)
 
-	// 先检查手机号是否已注册
-	checkResp, err := l.svcCtx.PassengerRpc.CheckPhone(l.ctx, &passengerpb.CheckPhoneReq{PassengerPhone: req.Phone})
-	if err != nil {
-		l.Errorf("PassengerRpc.CheckPhone RPC异常, phone=%s, err=%v", req.Phone, err)
-		return nil, errorx.ErrServiceUnavailable
-	}
-	if checkResp.Exists {
-		return nil, errorx.ErrPhoneRegistered
-	}
-
+	// 直接调用 Register RPC，由 RPC 服务端数据库 UNIQUE 约束保证手机号唯一性
 	resp, err := l.svcCtx.PassengerRpc.Register(l.ctx, &passengerpb.RegisterReq{
 		PassengerName:   req.Name,
 		PassengerPhone:  req.Phone,
@@ -92,11 +85,15 @@ func (l *LoginLogic) Login(req *types.PassengerLoginReq) (*LoginResp, error) {
 
 	conf := l.svcCtx.Config.AuthPassenger
 	secret := conf.GetAccessSecret("ONLINECAR_PASSENGER_JWT_SECRET")
+	now := time.Now()
 	claims := jwt.MapClaims{
-		"uid":     resp.Id,
-		"subject": "passenger",
-		"exp":     time.Now().Add(conf.AccessExpire).Unix(),
-		"iat":     time.Now().Unix(),
+		"sub":  fmt.Sprintf("passenger:%d", resp.Id),
+		"jti":  uuid.New().String(),
+		"uid":  resp.Id,
+		"role": "passenger",
+		"exp":  now.Add(conf.AccessExpire).Unix(),
+		"iat":  now.Unix(),
+		"nbf":  now.Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenStr, err := token.SignedString([]byte(secret))

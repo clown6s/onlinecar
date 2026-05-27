@@ -66,6 +66,13 @@ func (l *GetProvincesLogic) GetProvinces(in *pb.GetProvincesReq) (*pb.GetProvinc
 
 	// 2. 缓存未命中，使用 singleflight 防止击穿
 	v, sfErr, _ := sfGroup.Do(cacheKey, func() (interface{}, error) {
+		// 检查 context 是否已取消
+		select {
+		case <-l.ctx.Done():
+			return nil, l.ctx.Err()
+		default:
+		}
+
 		// double check：再次读缓存，可能其他 goroutine 已填充
 		if cached, err := l.svcCtx.Redis.Get(cacheKey); err == nil && cached != "" {
 			var resp pb.GetProvincesResp
@@ -74,8 +81,8 @@ func (l *GetProvincesLogic) GetProvinces(in *pb.GetProvincesReq) (*pb.GetProvinc
 			}
 		}
 
-		// 查数据库（省级 parent_adcode 为空）
-		list, err := l.svcCtx.DistrictModel.FindByParentAdCode(l.ctx, "")
+		// 查数据库
+		list, err := l.svcCtx.DistrictModel.FindProvinces(l.ctx)
 		if err != nil {
 			l.Errorf("查询省级行政区失败, err=%v", err)
 			return nil, err

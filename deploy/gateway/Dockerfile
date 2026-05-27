@@ -14,7 +14,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /gateway .
 # ========== 运行阶段 ==========
 FROM alpine:3.19
 
-RUN apk add --no-cache ca-certificates tzdata wget netcat-openbsd && \
+RUN apk add --no-cache ca-certificates tzdata netcat-openbsd && \
     addgroup -S -g 1000 appgroup && adduser -S -u 1000 -G appgroup appuser && \
     mkdir -p /var/log/onlinecar && \
     chown appuser:appgroup /var/log/onlinecar

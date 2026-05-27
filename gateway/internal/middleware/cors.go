@@ -65,8 +65,7 @@ func (m *CORSMiddleware) isWildcard() bool {
 func (m *CORSMiddleware) resolveOrigin(origin string) string {
 	for _, o := range m.allowOrigins {
 		if o == "*" {
-			// Credentials=true 时不能返回 *，回显请求的 Origin
-			return origin
+			return "*"
 		}
 		if o == origin {
 			return origin

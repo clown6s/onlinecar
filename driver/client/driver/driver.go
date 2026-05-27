@@ -46,54 +46,47 @@ type (
 	}
 
 	defaultDriver struct {
-		cli zrpc.Client
+		cli pb.DriverClient
 	}
 )
 
 func NewDriver(cli zrpc.Client) Driver {
 	return &defaultDriver{
-		cli: cli,
+		cli: pb.NewDriverClient(cli.Conn()),
 	}
 }
 
 // 注册
 func (m *defaultDriver) Register(ctx context.Context, in *RegisterReq, opts ...grpc.CallOption) (*RegisterResp, error) {
-	client := pb.NewDriverClient(m.cli.Conn())
-	return client.Register(ctx, in, opts...)
+	return m.cli.Register(ctx, in, opts...)
 }
 
 // 登录
 func (m *defaultDriver) Login(ctx context.Context, in *LoginReq, opts ...grpc.CallOption) (*LoginResp, error) {
-	client := pb.NewDriverClient(m.cli.Conn())
-	return client.Login(ctx, in, opts...)
+	return m.cli.Login(ctx, in, opts...)
 }
 
 // 更新位置
 func (m *defaultDriver) UpdateLocation(ctx context.Context, in *UpdateLocationReq, opts ...grpc.CallOption) (*Empty, error) {
-	client := pb.NewDriverClient(m.cli.Conn())
-	return client.UpdateLocation(ctx, in, opts...)
+	return m.cli.UpdateLocation(ctx, in, opts...)
 }
 
 // 获取司机信息
 func (m *defaultDriver) GetDriver(ctx context.Context, in *GetDriverReq, opts ...grpc.CallOption) (*DriverInfo, error) {
-	client := pb.NewDriverClient(m.cli.Conn())
-	return client.GetDriver(ctx, in, opts...)
+	return m.cli.GetDriver(ctx, in, opts...)
 }
 
 // 获取司机状态
 func (m *defaultDriver) GetDriverWorkStatus(ctx context.Context, in *GetDriverWorkStatusReq, opts ...grpc.CallOption) (*DriverWorkStatusInfo, error) {
-	client := pb.NewDriverClient(m.cli.Conn())
-	return client.GetDriverWorkStatus(ctx, in, opts...)
+	return m.cli.GetDriverWorkStatus(ctx, in, opts...)
 }
 
 // 更新司机状态
 func (m *defaultDriver) UpdateDriverWorkStatus(ctx context.Context, in *UpdateDriverWorkStatusReq, opts ...grpc.CallOption) (*Empty, error) {
-	client := pb.NewDriverClient(m.cli.Conn())
-	return client.UpdateDriverWorkStatus(ctx, in, opts...)
+	return m.cli.UpdateDriverWorkStatus(ctx, in, opts...)
 }
 
 // 检查手机号是否注册
 func (m *defaultDriver) CheckPhone(ctx context.Context, in *CheckPhoneReq, opts ...grpc.CallOption) (*CheckPhoneResp, error) {
-	client := pb.NewDriverClient(m.cli.Conn())
-	return client.CheckPhone(ctx, in, opts...)
+	return m.cli.CheckPhone(ctx, in, opts...)
 }

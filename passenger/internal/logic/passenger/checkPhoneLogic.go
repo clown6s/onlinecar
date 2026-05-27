@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"onlinecar-common/errorx"
 	"onlinecar-passenger/internal/svc"
 	"onlinecar-passenger/pb"
 
@@ -25,6 +26,11 @@ func NewCheckPhoneLogic(ctx context.Context, svcCtx *svc.ServiceContext) *CheckP
 }
 
 func (l *CheckPhoneLogic) CheckPhone(in *pb.CheckPhoneReq) (*pb.CheckPhoneResp, error) {
+	// 输入校验
+	if !phoneRegex.MatchString(in.PassengerPhone) {
+		return nil, errorx.ErrPhoneFormat
+	}
+
 	user, err := l.svcCtx.PassengerUserModel.FindByPhone(l.ctx, in.PassengerPhone)
 	if err != nil {
 		l.Errorf("查询乘客失败, phone=%s, err=%v", in.PassengerPhone, err)

@@ -87,7 +87,11 @@ func TestRegisterLogic_Success(t *testing.T) {
 func TestLoginLogic_Success(t *testing.T) {
 	ctx := context.Background()
 
-	svcCtx := newTestSvcCtx(&mockPassengerClient{})
+	svcCtx := newTestSvcCtx(&mockPassengerClient{
+		loginFunc: func(ctx context.Context, in *passengerpb.LoginReq, opts ...grpc.CallOption) (*passengerpb.LoginResp, error) {
+			return &passengerpb.LoginResp{Id: 1, PassengerName: "李四"}, nil
+		},
+	})
 	codeKey := "sms:code:passenger:13900000001"
 	svcCtx.Redis.Setex(codeKey, "123456", 300)
 
@@ -96,11 +100,11 @@ func TestLoginLogic_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
-	if resp["passengerId"].(int64) != 1 {
-		t.Errorf("expected passengerId=1, got: %v", resp["passengerId"])
-	}
-	if resp["token"] == nil || resp["token"].(string) == "" {
+	if resp.Token == "" {
 		t.Error("expected non-empty token")
+	}
+	if resp.ExpiresIn != 3600 {
+		t.Errorf("expected expiresIn=3600, got: %d", resp.ExpiresIn)
 	}
 }
 

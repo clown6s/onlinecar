@@ -8,6 +8,7 @@ import (
 
 	"onlinecar-gateway/internal/config"
 	"onlinecar-gateway/internal/handler"
+	"onlinecar-gateway/internal/middleware"
 	"onlinecar-gateway/internal/svc"
 
 	"github.com/zeromicro/go-zero/core/conf"
@@ -32,7 +33,11 @@ func main() {
 	defer server.Stop()
 
 	ctx := svc.NewServiceContext(c)
-	ctx.ProvinceCache.Start(context.Background())
+	defer middleware.StopRateLimiters()
+
+	cacheCtx, cacheCancel := context.WithCancel(context.Background())
+	defer cacheCancel()
+	ctx.ProvinceCache.Start(cacheCtx)
 	defer ctx.ProvinceCache.Stop()
 
 	handler.RegisterHandlers(server, ctx)

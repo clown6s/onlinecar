@@ -1,9 +1,11 @@
 package middleware
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"onlinecar-common/ctxdata"
@@ -67,9 +69,27 @@ func (m *JWTAuthMiddleware) Handle(next http.HandlerFunc) http.HandlerFunc {
 
 		uidFloat, ok := claims["uid"].(float64)
 		if !ok {
-			logx.Errorf("认证失败: token缺少uid, method=%s, path=%s, ip=%s",
-				r.Method, r.URL.Path, r.RemoteAddr)
-			httpx.Error(w, errorx.ErrTokenInvalid)
+			// 兼容多种 uid 类型，防止大 ID 精度丢失
+			var uid int64
+			switch v := claims["uid"].(type) {
+			case float64:
+				uid = int64(v)
+			case json.Number:
+				uid, _ = v.Int64()
+			case int64:
+				uid = v
+			case string:
+				uid, _ = strconv.ParseInt(v, 10, 64)
+			default:
+				logx.Errorf("认证失败: token uid类型异常, method=%s, path=%s, ip=%s, uidType=%T",
+					r.Method, r.URL.Path, r.RemoteAddr, claims["uid"])
+				httpx.Error(w, errorx.ErrTokenInvalid)
+				return
+			}
+
+			logx.Infof("认证通过, uid=%d, method=%s, path=%s", uid, r.Method, r.URL.Path)
+			ctx := ctxdata.SetUID(r.Context(), uid)
+			next(w, r.WithContext(ctx))
 			return
 		}
 		uid := int64(uidFloat)

@@ -2,8 +2,8 @@ package passengerlogic
 
 import (
 	"context"
-	"fmt"
 
+	"onlinecar-common/errorx"
 	"onlinecar-passenger/internal/svc"
 	"onlinecar-passenger/pb"
 
@@ -28,19 +28,25 @@ func NewLoginLogic(ctx context.Context, svcCtx *svc.ServiceContext) *LoginLogic 
 func (l *LoginLogic) Login(in *pb.LoginReq) (*pb.LoginResp, error) {
 	l.Infof("乘客登录, phone=%s", in.PassengerPhone)
 
+	// 输入校验
+	if !phoneRegex.MatchString(in.PassengerPhone) {
+		return nil, errorx.ErrPhoneFormat
+	}
+
 	passengerUser, err := l.svcCtx.PassengerUserModel.FindByPhone(l.ctx, in.PassengerPhone)
 	if err != nil {
-		l.Errorf("查询乘客失败, phone=%s, err=%v", in.PassengerPhone, err)
-		return nil, fmt.Errorf("查询失败，请稍后重试")
+		if codeErr, ok := err.(*errorx.CodeError); ok {
+			return nil, codeErr
+		}
+		logx.Errorf("查询乘客失败, phone=%s, err=%v", in.PassengerPhone, err)
+		return nil, errorx.ErrServer
 	}
 	if passengerUser == nil {
-		l.Errorf("乘客不存在, phone=%s", in.PassengerPhone)
-		return nil, fmt.Errorf("该手机号未注册")
+		return nil, errorx.ErrUserNotFound
 	}
 
 	resp := &pb.LoginResp{
-		Id:             passengerUser.Id,
-		PassengerPhone: in.PassengerPhone,
+		Id: passengerUser.Id,
 	}
 
 	if passengerUser.PassengerName != nil {

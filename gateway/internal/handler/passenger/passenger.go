@@ -2,6 +2,7 @@ package passenger
 
 import (
 	"net/http"
+	"unicode/utf8"
 
 	"onlinecar-common/errorx"
 	"onlinecar-gateway/common/response"
@@ -22,6 +23,15 @@ func RegisterHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		}
 		if !validate.IsValidPhone(req.Phone) {
 			response.Errorx(w, errorx.ErrPhoneFormat)
+			return
+		}
+		nameLen := utf8.RuneCountInString(req.Name)
+		if nameLen < 2 || nameLen > 20 {
+			response.Error(w, http.StatusBadRequest, errorx.ErrCodeParam, "姓名长度需在2-20个字符之间")
+			return
+		}
+		if req.Gender < 0 || req.Gender > 2 {
+			response.Error(w, http.StatusBadRequest, errorx.ErrCodeParam, "性别取值无效（0=未知, 1=男, 2=女）")
 			return
 		}
 		l := passengerlogic.NewRegisterLogic(r.Context(), svcCtx)

@@ -14,6 +14,12 @@ import (
 	"golang.org/x/time/rate"
 )
 
+// rateLimitStoppers 收集所有限流中间件的 Stop 方法，用于优雅关闭
+var (
+	rateLimitStoppers   []func()
+	rateLimitStoppersMu sync.Mutex
+)
+
 type ipLimiter struct {
 	limiter *rate.Limiter
 	lastRef time.Time
@@ -56,6 +62,9 @@ func NewRateLimitMiddleware(r int, trustedSubnets ...string) *RateLimitMiddlewar
 		}
 	}
 	go m.cleanupLoop()
+	rateLimitStoppersMu.Lock()
+	rateLimitStoppers = append(rateLimitStoppers, m.Stop)
+	rateLimitStoppersMu.Unlock()
 	return m
 }
 
@@ -131,6 +140,17 @@ func (m *RateLimitMiddleware) Stop() {
 	m.cancel()
 }
 
+// StopRateLimiters 停止所有已注册的限流中间件的 cleanupLoop goroutine
+func StopRateLimiters() {
+	rateLimitStoppersMu.Lock()
+	stoppers := make([]func(), len(rateLimitStoppers))
+	copy(stoppers, rateLimitStoppers)
+	rateLimitStoppersMu.Unlock()
+	for _, stop := range stoppers {
+		stop()
+	}
+}
+
 // GetClientIP 获取客户端真实 IP
 // 仅当请求来源属于可信代理网段时，才使用 X-Real-IP / X-Forwarded-For 头
 // 否则直接使用 RemoteAddr，防止客户端伪造代理头绕过限流
@@ -176,8 +196,12 @@ func GetClientIP(r *http.Request, trustedSubnets ...*net.IPNet) string {
 		}
 	}
 
-	// 不可信来源或无代理头时，直接使用 RemoteAddr
-	return r.RemoteAddr
+	// 不可信来源或无代理头时，使用 RemoteAddr（去除端口号）
+	ip := r.RemoteAddr
+	if host, _, err := net.SplitHostPort(ip); err == nil {
+		ip = host
+	}
+	return ip
 }
 
 func (m *RateLimitMiddleware) Handle(next http.HandlerFunc) http.HandlerFunc {

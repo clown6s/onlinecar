@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
+	"crypto/subtle"
 	"flag"
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
 
 	"onlinecar-district/internal/config"
@@ -58,19 +58,54 @@ func main() {
 			MinTime:             10 * time.Second,
 			PermitWithoutStream: false,
 		}),
+		// StreamInterceptor：panic recovery + 内部认证（与 UnaryInterceptor 保持一致）
+		grpc.StreamInterceptor(func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
+			defer func() {
+				if r := recover(); r != nil {
+					logx.Errorf("[gRPC Stream] panic recovered in %s: %v", info.FullMethod, r)
+					err = status.Errorf(codes.Internal, "internal server error")
+				}
+			}()
+
+			// 内部认证：校验 x-internal-token
+			isHealthCheck := info.FullMethod == "/grpc.health.v1.Health/Check" ||
+				info.FullMethod == "/grpc.health.v1.Health/Watch"
+			if !isHealthCheck {
+				expected := os.Getenv("ONLINECAR_INTERNAL_TOKEN")
+				if expected == "" {
+					logx.Severef("[gRPC Stream] ONLINECAR_INTERNAL_TOKEN 未设置，拒绝所有非健康检查请求")
+					return status.Errorf(codes.Unauthenticated, "internal token not configured")
+				}
+				md, ok := metadata.FromIncomingContext(ss.Context())
+				if !ok {
+					return status.Errorf(codes.Unauthenticated, "missing metadata")
+				}
+				tokens := md.Get("x-internal-token")
+				if len(tokens) == 0 || subtle.ConstantTimeCompare([]byte(tokens[0]), []byte(expected)) != 1 {
+					return status.Errorf(codes.Unauthenticated, "invalid internal token")
+				}
+			}
+
+			return handler(srv, ss)
+		}),
 		// UnaryInterceptor：统一日志、panic recovery + 简单认证
 		grpc.UnaryInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-			// 简单认证：校验 x-internal-token
-			if !strings.HasSuffix(info.FullMethod, "/Health/Check") {
-				if expected := os.Getenv("ONLINECAR_INTERNAL_TOKEN"); expected != "" {
-					md, ok := metadata.FromIncomingContext(ctx)
-					if !ok {
-						return nil, status.Errorf(codes.Unauthenticated, "missing metadata")
-					}
-					tokens := md.Get("x-internal-token")
-					if len(tokens) == 0 || tokens[0] != expected {
-						return nil, status.Errorf(codes.Unauthenticated, "invalid internal token")
-					}
+			// 简单认证：校验 x-internal-token（健康检查路径跳过）
+			isHealthCheck := info.FullMethod == "/grpc.health.v1.Health/Check" ||
+				info.FullMethod == "/grpc.health.v1.Health/Watch"
+			if !isHealthCheck {
+				expected := os.Getenv("ONLINECAR_INTERNAL_TOKEN")
+				if expected == "" {
+					logx.Severef("[gRPC] ONLINECAR_INTERNAL_TOKEN 未设置，拒绝所有非健康检查请求")
+					return nil, status.Errorf(codes.Unauthenticated, "internal token not configured")
+				}
+				md, ok := metadata.FromIncomingContext(ctx)
+				if !ok {
+					return nil, status.Errorf(codes.Unauthenticated, "missing metadata")
+				}
+				tokens := md.Get("x-internal-token")
+				if len(tokens) == 0 || subtle.ConstantTimeCompare([]byte(tokens[0]), []byte(expected)) != 1 {
+					return nil, status.Errorf(codes.Unauthenticated, "invalid internal token")
 				}
 			}
 

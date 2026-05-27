@@ -108,7 +108,11 @@ func TestLoginLogic_Success(t *testing.T) {
 	ctx := context.Background()
 
 	// 先发验证码（写入 Redis）
-	svcCtx := newTestSvcCtx(&mockDriverClient{})
+	svcCtx := newTestSvcCtx(&mockDriverClient{
+		loginFunc: func(ctx context.Context, in *driverpb.LoginReq, opts ...grpc.CallOption) (*driverpb.LoginResp, error) {
+			return &driverpb.LoginResp{Id: 1, DriverName: "张三"}, nil
+		},
+	})
 	codeKey := "sms:code:driver:13800000001"
 	svcCtx.Redis.Setex(codeKey, "123456", 300)
 
@@ -118,11 +122,11 @@ func TestLoginLogic_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
-	if resp["driverId"].(int64) != 1 {
-		t.Errorf("expected driverId=1, got: %v", resp["driverId"])
-	}
-	if resp["token"] == nil || resp["token"].(string) == "" {
+	if resp.Token == "" {
 		t.Error("expected non-empty token")
+	}
+	if resp.ExpiresIn != 3600 {
+		t.Errorf("expected expiresIn=3600, got: %d", resp.ExpiresIn)
 	}
 }
 

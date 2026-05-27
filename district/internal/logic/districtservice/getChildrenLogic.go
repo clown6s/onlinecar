@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 
+	"onlinecar-district/internal/model"
 	"onlinecar-district/internal/svc"
 	"onlinecar-district/pb"
 
@@ -41,6 +41,7 @@ func (l *GetChildrenLogic) GetChildren(in *pb.GetChildrenReq) (*pb.GetChildrenRe
 	if err == nil && cached != "" {
 		var resp pb.GetChildrenResp
 		if err = json.Unmarshal([]byte(cached), &resp); err == nil {
+			// 缓存命中，空数组也直接返回（防穿透）
 			l.Infof("命中缓存, key=%s, count=%d", cacheKey, len(resp.List))
 			return &resp, nil
 		}
@@ -49,6 +50,13 @@ func (l *GetChildrenLogic) GetChildren(in *pb.GetChildrenReq) (*pb.GetChildrenRe
 
 	// 2. 缓存未命中，使用 singleflight 防止击穿
 	v, sfErr, _ := sfGroup.Do(cacheKey, func() (interface{}, error) {
+		// 检查 context 是否已取消
+		select {
+		case <-l.ctx.Done():
+			return nil, l.ctx.Err()
+		default:
+		}
+
 		// double check：再次读缓存，可能其他 goroutine 已填充
 		if cached, err := l.svcCtx.Redis.Get(cacheKey); err == nil && cached != "" {
 			var resp pb.GetChildrenResp
@@ -57,11 +65,18 @@ func (l *GetChildrenLogic) GetChildren(in *pb.GetChildrenReq) (*pb.GetChildrenRe
 			}
 		}
 
-		// 查数据库（parentAdCode 转 string 给 model）
-		list, err := l.svcCtx.DistrictModel.FindByParentAdCode(l.ctx, strconv.FormatUint(uint64(in.ParentAdCode), 10))
-		if err != nil {
-			l.Errorf("查询子级行政区失败, parentAdCode=%d, err=%v", in.ParentAdCode, err)
-			return nil, err
+		var list []*model.District
+		var dbErr error
+
+		if in.ParentAdCode == 0 {
+			// 复用省级查询逻辑
+			list, dbErr = l.svcCtx.DistrictModel.FindProvinces(l.ctx)
+		} else {
+			list, dbErr = l.svcCtx.DistrictModel.FindByParentAdCode(l.ctx, in.ParentAdCode)
+		}
+		if dbErr != nil {
+			l.Errorf("查询子级行政区失败, parentAdCode=%d, err=%v", in.ParentAdCode, dbErr)
+			return nil, dbErr
 		}
 
 		resp := &pb.GetChildrenResp{}
@@ -80,7 +95,12 @@ func (l *GetChildrenLogic) GetChildren(in *pb.GetChildrenReq) (*pb.GetChildrenRe
 
 		// 写入缓存（失败不影响响应）
 		if data, marshalErr := json.Marshal(resp); marshalErr == nil {
-			if setErr := l.svcCtx.Redis.Setex(cacheKey, string(data), int(cacheTTL().Seconds())); setErr != nil {
+			ttl := int(cacheTTL().Seconds())
+			if len(list) == 0 {
+				// 缓存空结果，防穿透，5分钟TTL
+				ttl = 300
+			}
+			if setErr := l.svcCtx.Redis.Setex(cacheKey, string(data), ttl); setErr != nil {
 				l.Errorf("写入缓存失败, key=%s, err=%v", cacheKey, setErr)
 			}
 		}

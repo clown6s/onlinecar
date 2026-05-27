@@ -2,9 +2,9 @@ package driverlogic
 
 import (
 	"context"
-	"errors"
-	"fmt"
+	"regexp"
 
+	"onlinecar-common/errorx"
 	"onlinecar-driver/internal/model"
 	"onlinecar-driver/internal/svc"
 	"onlinecar-driver/pb"
@@ -30,14 +30,21 @@ func NewLoginLogic(ctx context.Context, svcCtx *svc.ServiceContext) *LoginLogic 
 func (l *LoginLogic) Login(in *pb.LoginReq) (*pb.LoginResp, error) {
 	l.Infof("司机登录, phone=%s", in.DriverPhone)
 
+	// 手机号格式校验
+	matched, _ := regexp.MatchString(`^1[3-9]\d{9}$`, in.DriverPhone)
+	if !matched {
+		return nil, errorx.ErrPhoneFormat
+	}
+
 	driverUser, err := l.svcCtx.DriverUserModel.FindByPhone(l.ctx, in.DriverPhone)
 	if err != nil {
-		if errors.Is(err, model.ErrNotFound) {
+		if err == model.ErrNotFound {
 			l.Errorf("司机不存在, phone=%s", in.DriverPhone)
-			return nil, fmt.Errorf("该手机号未注册")
+		} else {
+			l.Errorf("查询司机失败, phone=%s, err=%v", in.DriverPhone, err)
 		}
-		l.Errorf("查询司机失败, phone=%s, err=%v", in.DriverPhone, err)
-		return nil, fmt.Errorf("查询失败，请稍后重试")
+		// 统一返回模糊信息，避免暴露注册状态
+		return nil, errorx.NewCodeError(errorx.ErrAuth.Code, "手机号或验证码错误")
 	}
 
 	// 验证码在 Gateway 层已校验，此处仅查询用户
