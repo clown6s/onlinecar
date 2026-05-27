@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package district;
+
+option go_package = "./pb";
+
+
+service DistrictService {
+  rpc GetProvinces (GetProvincesReq) returns (GetProvincesResp);
+  rpc GetChildren (GetChildrenReq) returns (GetChildrenResp);
+  rpc UpdateDistrict (UpdateDistrictReq) returns (UpdateDistrictResp);
+}
+
+// GetProvinces —— 返回省级行政区列表（扁平，无 children）
+message GetProvincesReq {}
+
+message GetProvincesResp {
+  repeated DistrictNode list = 1;
+}
+
+// GetChildren —— 返回指定行政区划的直接下级子节点
+message GetChildrenReq {
+  uint32 parentAdCode = 1;
+}
+
+message GetChildrenResp {
+  repeated DistrictNode list = 1;
+}
+
+message UpdateDistrictReq {}
+
+message UpdateDistrictResp {}
+
+// DistrictNode —— 扁平节点，无 children 字段，用于懒加载接口
+message DistrictNode {
+  int64 id = 1;
+  uint32 adCode = 2;
+  string name = 3;
+  string level = 4;
+  string center = 5;
+}

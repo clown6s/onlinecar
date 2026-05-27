@@ -56,7 +56,7 @@ func (l *SendSmsLogic) SendSms(phone string) error {
 	if err := l.svcCtx.Redis.Setex(limitKey, "1", int(limitTTL.Seconds())); err != nil {
 		l.Errorf("Redis.Setex 频率限制失败, key=%s, err=%v", limitKey, err)
 		// 频率限制写入失败时回滚验证码，防止限流失效
-		_ = l.svcCtx.Redis.Del(codeKey)
+		_, _ = l.svcCtx.Redis.Del(codeKey)
 		return errorx.ErrSmsSendFailed
 	}
 

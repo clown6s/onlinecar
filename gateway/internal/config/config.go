@@ -28,8 +28,9 @@ type Config struct {
 	AuthPassenger JwtConf
 	DriverRpc     zrpc.RpcClientConf
 	PassengerRpc  zrpc.RpcClientConf
-	RedisConf     redis.RedisConf
-	CORS          CORSConf
+
+	RedisConf redis.RedisConf
+	CORS      CORSConf
 }
 
 type CORSConf struct {
