@@ -70,6 +70,9 @@ const (
 	ErrCodeTripStatusInvalid = 30002
 	ErrCodeTripCreateFailed  = 30003
 
+	// 行政区划相关 60001-60099
+	ErrCodeDistrictNotFound = 60001
+
 	// 认证相关 40001-40099
 	ErrCodeTokenExpired        = 40001
 	ErrCodeTokenInvalid        = 40002
@@ -101,6 +104,9 @@ var (
 	ErrTripNotFound      = NewCodeError(ErrCodeTripNotFound, "行程不存在")
 	ErrTripStatusInvalid = NewCodeError(ErrCodeTripStatusInvalid, "行程状态不允许此操作")
 	ErrTripCreateFailed  = NewCodeError(ErrCodeTripCreateFailed, "创建行程失败")
+
+	// 行政区划
+	ErrDistrictNotFound = NewCodeError(ErrCodeDistrictNotFound, "行政区划不存在")
 
 	// 认证
 	ErrTokenExpired        = NewCodeError(ErrCodeTokenExpired, "token已过期")
@@ -139,6 +145,8 @@ func MapRpcError(err error) *CodeError {
 		return ErrParam
 	case strings.Contains(msg, "乘客账号已禁用"):
 		return ErrUserDisabled
+	case strings.Contains(msg, "行政区划不存在"):
+		return ErrDistrictNotFound
 	}
 
 	// 默认返回服务不可用（不暴露内部错误细节）

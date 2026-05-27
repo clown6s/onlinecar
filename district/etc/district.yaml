@@ -1,14 +1,20 @@
 Name: district.rpc
-ListenOn: 0.0.0.0:6000
+ListenOn: 0.0.0.0:6002
 Timeout: 30000
 
 Etcd:
   Hosts:
-  - 10.211.55.5:2379
+    - 10.211.55.5:2379
   Key: district.rpc
 
 # MySQL
 DataSource: "root:admin@zzp@tcp(10.211.55.5:3306)/online_car?charset=utf8mb4&parseTime=true&loc=Local"
+
+# Redis
+RedisConf:
+  Host: 10.211.55.5:6379
+  Type: node
+  Pass: "admin@zzp"
 
 # 日志
 Log:

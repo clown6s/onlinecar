@@ -469,6 +469,56 @@ services:
         max-size: "100m"
         max-file: "3"
 
+  district:
+    build:
+      context: ../district
+      dockerfile: ../deploy/district/Dockerfile
+    # gRPC 端口仅容器内互通，不暴露
+    # ports:
+    #   - "6002:6002"
+    environment:
+      OTEL_SERVICE_NAME: district.rpc
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_TRACES_SAMPLER: always_on
+      DB_PASSWORD: "OnlineCar@2026#Prod"
+      REDIS_PASSWORD: "OnlineCar@2026#Redis"
+    depends_on:
+      log-init:
+        condition: service_completed_successfully
+      etcd-setup:
+        condition: service_completed_successfully
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+    volumes:
+      - onlinecar_logs:/var/log/onlinecar
+      - ./config/district.yaml:/app/etc/district.yaml:ro
+    networks:
+      - onlinecar
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "6002"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
+
   gateway:
     build:
       context: ../gateway
@@ -489,6 +539,8 @@ services:
       driver:
         condition: service_started
       passenger:
+        condition: service_started
+      district:
         condition: service_started
       jaeger:
         condition: service_healthy

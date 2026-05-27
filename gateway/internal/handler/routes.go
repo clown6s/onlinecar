@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 
+	districthandler "onlinecar-gateway/internal/handler/district"
 	driverhandler "onlinecar-gateway/internal/handler/driver"
 	healthhandler "onlinecar-gateway/internal/handler/health"
 	passengerhandler "onlinecar-gateway/internal/handler/passenger"
@@ -37,6 +38,8 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/api/v1/passenger/register", Handler: passengerhandler.RegisterHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/passenger/login", Handler: passengerhandler.LoginHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/passenger/sms/send", Handler: smshandler.PassengerSendSmsHandler(svcCtx)},
+		{Method: http.MethodGet, Path: "/api/v1/district/provinces", Handler: districthandler.GetProvincesHandler(svcCtx)},
+		{Method: http.MethodGet, Path: "/api/v1/district/children/:parentAdCode", Handler: districthandler.GetChildrenHandler(svcCtx)},
 	}
 	// 限制请求体大小 1MB
 	for i := range publicRoutes {

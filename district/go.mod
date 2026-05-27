@@ -1,4 +1,4 @@
-module district
+module onlinecar-district
 
 go 1.26.1
 

@@ -1,0 +1,32 @@
+Name: district.rpc
+ListenOn: 0.0.0.0:6002
+Timeout: 30000
+GracefulShutdownTimeout: 25s
+
+Etcd:
+  Hosts:
+    - etcd-1:2379
+    - etcd-2:2379
+    - etcd-3:2379
+  Key: district.rpc
+  User: onlinecar
+  Pass: "OnlineCar@2026#EtcdApp"
+
+# MySQL
+DataSource: "root:OnlineCar@2026#Prod@tcp(mysql:3306)/online_car?charset=utf8mb4&parseTime=true&loc=Local"
+
+# Redis
+RedisConf:
+  Host: redis:6379
+  Type: node
+  Pass: "OnlineCar@2026#Redis"
+
+# 日志（file 模式，Promtail 采集）
+Log:
+  ServiceName: district.rpc
+  Mode: file
+  Path: /var/log/onlinecar
+  Level: info
+  Encoding: json
+  KeepDays: 7
+  Compress: true

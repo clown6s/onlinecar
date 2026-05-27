@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	"district/internal/logic/districtservice"
-	"district/internal/svc"
-	"district/pb"
+	"onlinecar-district/internal/logic/districtservice"
+	"onlinecar-district/internal/svc"
+	"onlinecar-district/pb"
 )
 
 type DistrictServiceServer struct {

@@ -3,8 +3,8 @@ package districtservicelogic
 import (
 	"context"
 
-	"district/internal/svc"
-	"district/pb"
+	"onlinecar-district/internal/svc"
+	"onlinecar-district/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -23,8 +23,10 @@ func NewUpdateDistrictLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Up
 	}
 }
 
+// 更新行政区划数据
 func (l *UpdateDistrictLogic) UpdateDistrict(in *pb.UpdateDistrictReq) (*pb.UpdateDistrictResp, error) {
-	// todo: add your logic here and delete this line
+	l.Info("更新行政区划数据")
 
+	// UpdateDistrictReq 当前为空消息，预留接口
 	return &pb.UpdateDistrictResp{}, nil
 }

@@ -7,7 +7,7 @@ package districtservice
 import (
 	"context"
 
-	"district/pb"
+	"onlinecar-district/pb"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"

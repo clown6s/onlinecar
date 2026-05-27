@@ -90,3 +90,13 @@ type TripResp struct {
 	Status      int64   `json:"status"`
 	Fare        float64 `json:"fare"`
 }
+
+// ========== 行政区划 ==========
+
+type DistrictNodeResp struct {
+	Id     int64  `json:"id"`
+	AdCode uint32 `json:"adCode"`
+	Name   string `json:"name"`
+	Level  string `json:"level"`
+	Center string `json:"center"`
+}
