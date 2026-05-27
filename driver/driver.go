@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"onlinecar-driver/internal/config"
 	driverserver "onlinecar-driver/internal/server/driver"
@@ -14,8 +16,11 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/status"
 )
 
 func main() {
@@ -37,6 +42,40 @@ func main() {
 		pb.RegisterDriverServer(grpcServer, driverserver.NewDriverServer(svcCtx))
 		grpc_health_v1.RegisterHealthServer(grpcServer, health.NewServer())
 	})
+	// 设置服务端参数
+	srv.AddOptions(
+		// 限制最大消息大小为 4MB（默认值显式声明，可根据业务调整）
+		grpc.MaxRecvMsgSize(4*1024*1024),
+		grpc.MaxSendMsgSize(4*1024*1024),
+		// Keepalive 参数
+		grpc.KeepaliveParams(keepalive.ServerParameters{
+			MaxConnectionIdle: 5 * time.Minute,
+			MaxConnectionAge:  30 * time.Minute,
+			Time:              30 * time.Second,
+			Timeout:           10 * time.Second,
+		}),
+		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
+			MinTime:             10 * time.Second,
+			PermitWithoutStream: false,
+		}),
+		// UnaryInterceptor：统一日志、panic recovery
+		grpc.UnaryInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+			startTime := time.Now()
+			resp, err := handler(ctx, req)
+			duration := time.Since(startTime)
+
+			if err != nil {
+				code := status.Code(err)
+				logx.Errorf("[gRPC] %s 耗时=%v code=%s err=%v",
+					info.FullMethod, duration, code.String(), err)
+			} else {
+				logx.Infof("[gRPC] %s 耗时=%v code=%s",
+					info.FullMethod, duration, codes.OK.String())
+			}
+
+			return resp, err
+		}),
+	)
 	defer srv.Stop()
 
 	logx.Infof("Starting driver rpc server at %s...", c.ListenOn)

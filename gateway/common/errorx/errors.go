@@ -3,6 +3,7 @@ package errorx
 import (
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 type CodeError struct {
@@ -112,3 +113,34 @@ var (
 	ErrRpcCallFailed      = NewCodeError(ErrCodeRpcCallFailed, "RPC调用失败")
 	ErrDatabaseError      = NewCodeError(ErrCodeDatabaseError, "数据库错误")
 )
+
+// MapRpcError 将 gRPC 传输过来的错误映射为 CodeError。
+// 跨 gRPC 传输后 CodeError 类型会丢失为普通 error，通过错误消息中的关键词匹配恢复业务错误码。
+func MapRpcError(err error) *CodeError {
+	if err == nil {
+		return nil
+	}
+	msg := err.Error()
+
+	switch {
+	case strings.Contains(msg, "该手机号已注册"):
+		return ErrPhoneRegistered
+	case strings.Contains(msg, "不存在"):
+		return ErrUserNotFound
+	case strings.Contains(msg, "已禁用"):
+		return ErrUserDisabled
+	case strings.Contains(msg, "无效的"):
+		return ErrParam
+	case strings.Contains(msg, "不能为空"):
+		return ErrParam
+	case strings.Contains(msg, "创建行程失败"):
+		return ErrTripCreateFailed
+	case strings.Contains(msg, "坐标无效"):
+		return ErrParam
+	case strings.Contains(msg, "乘客账号已禁用"):
+		return ErrUserDisabled
+	}
+
+	// 默认返回服务不可用（不暴露内部错误细节）
+	return ErrServiceUnavailable
+}

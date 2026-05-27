@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"onlinecar-driver/common/errorx"
 	"onlinecar-driver/internal/model"
 	"onlinecar-driver/internal/svc"
 	"onlinecar-driver/pb"
@@ -45,7 +46,7 @@ func (l *RegisterLogic) Register(in *pb.RegisterReq) (*pb.RegisterResp, error) {
 			return fmt.Errorf("查询司机失败: %w", err)
 		}
 		if existing != nil {
-			return fmt.Errorf("该手机号已注册")
+			return errorx.ErrPhoneRegistered
 		}
 
 		// 2. 插入司机

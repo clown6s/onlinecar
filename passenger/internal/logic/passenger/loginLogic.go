@@ -31,7 +31,7 @@ func (l *LoginLogic) Login(in *pb.LoginReq) (*pb.LoginResp, error) {
 	passengerUser, err := l.svcCtx.PassengerUserModel.FindByPhone(l.ctx, in.PassengerPhone)
 	if err != nil {
 		l.Errorf("查询乘客失败, phone=%s, err=%v", in.PassengerPhone, err)
-		return nil, fmt.Errorf("查询失败: %v", err)
+		return nil, fmt.Errorf("查询失败，请稍后重试")
 	}
 	if passengerUser == nil {
 		l.Errorf("乘客不存在, phone=%s", in.PassengerPhone)

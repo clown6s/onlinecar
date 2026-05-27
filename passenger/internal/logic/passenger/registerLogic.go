@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"onlinecar-passenger/common/errorx"
 	"onlinecar-passenger/internal/model"
 	"onlinecar-passenger/internal/svc"
 	"onlinecar-passenger/pb"
@@ -42,7 +43,7 @@ func (l *RegisterLogic) Register(in *pb.RegisterReq) (*pb.RegisterResp, error) {
 			return fmt.Errorf("查询乘客失败: %w", err)
 		}
 		if existing != nil {
-			return fmt.Errorf("该手机号已注册")
+			return errorx.ErrPhoneRegistered
 		}
 
 		passengerUser := &model.PassengerUser{

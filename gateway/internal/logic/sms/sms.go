@@ -35,11 +35,6 @@ func NewSendSmsLogic(ctx context.Context, svcCtx *svc.ServiceContext, role strin
 }
 
 func (l *SendSmsLogic) SendSms(phone string) error {
-	// 检查手机号是否已注册
-	if err := l.checkPhoneExists(phone); err != nil {
-		return err
-	}
-
 	// 频率限制检查
 	limitKey := fmt.Sprintf("%s%s:%s", limitPrefix, l.role, phone)
 	limitVal, err := l.svcCtx.Redis.Get(limitKey)
@@ -60,6 +55,9 @@ func (l *SendSmsLogic) SendSms(phone string) error {
 	// 设频率限制
 	if err := l.svcCtx.Redis.Setex(limitKey, "1", int(limitTTL.Seconds())); err != nil {
 		l.Errorf("Redis.Setex 频率限制失败, key=%s, err=%v", limitKey, err)
+		// 频率限制写入失败时回滚验证码，防止限流失效
+		_ = l.svcCtx.Redis.Del(codeKey)
+		return errorx.ErrSmsSendFailed
 	}
 
 	// 发送短信
@@ -96,7 +94,20 @@ func (l *SendSmsLogic) checkPhoneExists(phone string) error {
 	return nil
 }
 
-// VerifyCode 校验验证码，成功后自动删除（防重放）
+// verifyCodeScript 原子化验证码校验+删除（防并发重放）
+const verifyCodeScript = `
+local stored = redis.call('GET', KEYS[1])
+if not stored or stored == '' then
+	return -1
+end
+if stored ~= ARGV[1] then
+	return 0
+end
+redis.call('DEL', KEYS[1])
+return 1
+`
+
+// VerifyCode 校验验证码，成功后自动删除（原子操作，防重放）
 func VerifyCode(ctx context.Context, svcCtx *svc.ServiceContext, role, phone, code string) error {
 	if !validate.IsValidPhone(phone) {
 		return errorx.ErrPhoneFormat
@@ -107,18 +118,35 @@ func VerifyCode(ctx context.Context, svcCtx *svc.ServiceContext, role, phone, co
 
 	codeKey := fmt.Sprintf("%s%s:%s", codePrefix, role, phone)
 
-	stored, err := svcCtx.Redis.Get(codeKey)
-	if err != nil || stored == "" {
+	result, err := svcCtx.Redis.Eval(verifyCodeScript, []string{codeKey}, code)
+	if err != nil {
+		logx.Errorf("[SMS] 验证码校验Lua执行失败, key=%s, err=%v", codeKey, err)
 		return errorx.ErrSmsCodeExpired
 	}
 
-	if stored != code {
-		return errorx.ErrSmsCodeError
+	// Eval 返回值类型为 int64: -1=不存在, 0=不匹配, 1=成功
+	switch val := result.(type) {
+	case int64:
+		switch val {
+		case -1:
+			return errorx.ErrSmsCodeExpired
+		case 0:
+			return errorx.ErrSmsCodeError
+		case 1:
+			return nil
+		}
+	case string:
+		// go-zero 的 Eval 可能返回字符串形式的数字
+		switch val {
+		case "-1":
+			return errorx.ErrSmsCodeExpired
+		case "0":
+			return errorx.ErrSmsCodeError
+		case "1":
+			return nil
+		}
 	}
 
-	// 删除已使用的验证码（防重放）
-	if _, err := svcCtx.Redis.Del(codeKey); err != nil {
-		logx.Errorf("[SMS] Redis.Del 验证码失败, key=%s, err=%v", codeKey, err)
-	}
-	return nil
+	logx.Errorf("[SMS] 验证码校验返回异常值, key=%s, result=%v", codeKey, result)
+	return errorx.ErrSmsCodeExpired
 }

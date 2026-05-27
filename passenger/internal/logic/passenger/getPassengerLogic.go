@@ -31,7 +31,7 @@ func (l *GetPassengerLogic) GetPassenger(in *pb.GetPassengerReq) (*pb.PassengerI
 	passengerUser, err := l.svcCtx.PassengerUserModel.FindOne(l.ctx, in.Id)
 	if err != nil {
 		l.Errorf("查询乘客失败, passengerId=%d, err=%v", in.Id, err)
-		return nil, fmt.Errorf("查询失败: %v", err)
+		return nil, fmt.Errorf("查询失败，请稍后重试")
 	}
 	if passengerUser == nil {
 		return nil, fmt.Errorf("乘客不存在")

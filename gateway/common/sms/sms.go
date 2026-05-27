@@ -18,6 +18,6 @@ func NewMockSmsSender() *MockSmsSender {
 }
 
 func (m *MockSmsSender) Send(_ context.Context, phone, code string) error {
-	slog.Info("mock sms sent", "phone", phone, "code", code)
+	slog.Info("mock sms sent", "phone", phone, "code_len", len(code))
 	return nil
 }

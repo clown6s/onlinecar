@@ -32,6 +32,9 @@ services:
         limits:
           cpus: "0.5"
           memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
     logging:
       driver: json-file
       options:
@@ -63,6 +66,9 @@ services:
         limits:
           cpus: "0.5"
           memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
     logging:
       driver: json-file
       options:
@@ -94,6 +100,9 @@ services:
         limits:
           cpus: "0.5"
           memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
     logging:
       driver: json-file
       options:
@@ -130,6 +139,9 @@ services:
         limits:
           cpus: "1.0"
           memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 512M
     logging:
       driver: json-file
       options:
@@ -163,6 +175,9 @@ services:
         limits:
           cpus: "0.5"
           memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
     logging:
       driver: json-file
       options:
@@ -198,6 +213,9 @@ services:
         limits:
           cpus: "1.0"
           memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
     logging:
       driver: json-file
       options:
@@ -207,8 +225,9 @@ services:
   # Loki 日志存储
   loki:
     image: grafana/loki:3.5.1
-    ports:
-      - "3100:3100"
+    # 端口不暴露到宿主机，仅容器内网络可访问（Grafana 通过容器网络连接）
+    # ports:
+    #   - "3100:3100"
     volumes:
       - loki_data:/loki
     networks:
@@ -224,6 +243,9 @@ services:
         limits:
           cpus: "0.5"
           memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
     logging:
       driver: json-file
       options:
@@ -247,6 +269,9 @@ services:
         limits:
           cpus: "0.25"
           memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
     logging:
       driver: json-file
       options:
@@ -287,6 +312,9 @@ services:
         limits:
           cpus: "0.5"
           memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
     logging:
       driver: json-file
       options:
@@ -470,14 +498,20 @@ services:
     networks:
       - onlinecar
     restart: on-failure
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "7000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     deploy:
       resources:
         limits:
-          cpus: "2.0"
-          memory: 1G
+          cpus: "1.0"
+          memory: 512M
         reservations:
-          cpus: "0.5"
-          memory: 256M
+          cpus: "0.25"
+          memory: 128M
     logging:
       driver: json-file
       options:

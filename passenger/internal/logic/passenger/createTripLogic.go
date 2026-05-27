@@ -40,6 +40,27 @@ func (l *CreateTripLogic) CreateTrip(in *pb.CreateTripReq) (*pb.TripResp, error)
 		return nil, fmt.Errorf("终点不能为空")
 	}
 
+	// 验证乘客是否存在
+	passenger, err := l.svcCtx.PassengerUserModel.FindOne(l.ctx, in.PassengerId)
+	if err != nil {
+		l.Errorf("查询乘客失败, passengerId=%d, err=%v", in.PassengerId, err)
+		return nil, fmt.Errorf("查询乘客失败")
+	}
+	if passenger == nil {
+		return nil, fmt.Errorf("乘客不存在")
+	}
+	if passenger.State != nil && *passenger.State == 1 {
+		return nil, fmt.Errorf("乘客账号已禁用")
+	}
+
+	// 验证坐标范围
+	if in.OriginLng < -180 || in.OriginLng > 180 || in.OriginLat < -90 || in.OriginLat > 90 {
+		return nil, fmt.Errorf("起点坐标无效")
+	}
+	if in.DestLng < -180 || in.DestLng > 180 || in.DestLat < -90 || in.DestLat > 90 {
+		return nil, fmt.Errorf("终点坐标无效")
+	}
+
 	trip := &model.Trip{
 		PassengerId: in.PassengerId,
 		Origin:      in.Origin,

@@ -44,7 +44,7 @@ func (l *RegisterLogic) Register(req *types.PassengerRegisterReq) (*types.Passen
 	})
 	if err != nil {
 		l.Errorf("PassengerRpc.Register 失败, phone=%s, err=%v", req.Phone, err)
-		return nil, err
+		return nil, errorx.MapRpcError(err)
 	}
 
 	l.Infof("乘客注册成功, passengerId=%d", resp.Id)
@@ -79,7 +79,7 @@ func (l *LoginLogic) Login(req *types.PassengerLoginReq) (map[string]any, error)
 	})
 	if err != nil {
 		l.Errorf("PassengerRpc.Login 失败, phone=%s, err=%v", req.Phone, err)
-		return nil, err
+		return nil, errorx.MapRpcError(err)
 	}
 
 	conf := l.svcCtx.Config.AuthPassenger

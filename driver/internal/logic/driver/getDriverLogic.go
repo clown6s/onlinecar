@@ -31,7 +31,7 @@ func (l *GetDriverLogic) GetDriver(in *pb.GetDriverReq) (*pb.DriverInfo, error) 
 	driverUser, err := l.svcCtx.DriverUserModel.FindOne(l.ctx, in.Id)
 	if err != nil {
 		l.Errorf("查询司机失败, driverId=%d, err=%v", in.Id, err)
-		return nil, fmt.Errorf("查询失败: %v", err)
+		return nil, fmt.Errorf("查询失败，请稍后重试")
 	}
 	if driverUser == nil {
 		return nil, fmt.Errorf("司机不存在")
@@ -56,9 +56,16 @@ func (l *GetDriverLogic) GetDriver(in *pb.GetDriverReq) (*pb.DriverInfo, error) 
 	}
 
 	// 查询绑定的车辆信息
-	binding, _ := l.svcCtx.DriverCarBindingModel.FindByDriverId(l.ctx, in.Id)
+	binding, err := l.svcCtx.DriverCarBindingModel.FindByDriverId(l.ctx, in.Id)
+	if err != nil {
+		l.Errorf("查询司机车辆绑定失败, driverId=%d, err=%v", in.Id, err)
+		// 绑定查询失败不影响基本信息返回，仅日志记录
+	}
 	if binding != nil && binding.CarId != nil {
-		car, _ := l.svcCtx.CarModel.FindOne(l.ctx, *binding.CarId)
+		car, err := l.svcCtx.CarModel.FindOne(l.ctx, *binding.CarId)
+		if err != nil {
+			l.Errorf("查询车辆信息失败, carId=%d, err=%v", *binding.CarId, err)
+		}
 		if car != nil {
 			info.VehicleNo = car.VehicleNo
 			if car.VehicleType != nil {
@@ -74,7 +81,10 @@ func (l *GetDriverLogic) GetDriver(in *pb.GetDriverReq) (*pb.DriverInfo, error) 
 	}
 
 	// 查询工作状态
-	workStatus, _ := l.svcCtx.DriverWorkStatusModel.FindByDriverId(l.ctx, in.Id)
+	workStatus, err := l.svcCtx.DriverWorkStatusModel.FindByDriverId(l.ctx, in.Id)
+	if err != nil {
+		l.Errorf("查询司机工作状态失败, driverId=%d, err=%v", in.Id, err)
+	}
 	if workStatus != nil && workStatus.WorkStatus != nil {
 		info.WorkStatus = int64(*workStatus.WorkStatus)
 	}

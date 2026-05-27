@@ -47,7 +47,7 @@ func (l *RegisterLogic) Register(req *types.DriverRegisterReq) (*types.DriverRes
 	})
 	if err != nil {
 		l.Errorf("DriverRpc.Register 失败, phone=%s, err=%v", req.Phone, err)
-		return nil, err
+		return nil, errorx.MapRpcError(err)
 	}
 
 	l.Infof("司机注册成功, driverId=%d", resp.Id)
@@ -82,7 +82,7 @@ func (l *LoginLogic) Login(req *types.DriverLoginReq) (map[string]any, error) {
 	})
 	if err != nil {
 		l.Errorf("DriverRpc.Login 失败, phone=%s, err=%v", req.Phone, err)
-		return nil, err
+		return nil, errorx.MapRpcError(err)
 	}
 
 	conf := l.svcCtx.Config.AuthDriver
@@ -130,7 +130,7 @@ func (l *UpdateLocationLogic) UpdateLocation(req *types.DriverLocationReq) error
 	})
 	if err != nil {
 		l.Errorf("DriverRpc.UpdateLocation 失败, driverId=%d, err=%v", uid, err)
-		return err
+		return errorx.MapRpcError(err)
 	}
 	return nil
 }

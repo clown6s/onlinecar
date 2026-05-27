@@ -31,7 +31,7 @@ func (l *LoginLogic) Login(in *pb.LoginReq) (*pb.LoginResp, error) {
 	driverUser, err := l.svcCtx.DriverUserModel.FindByPhone(l.ctx, in.DriverPhone)
 	if err != nil {
 		l.Errorf("查询司机失败, phone=%s, err=%v", in.DriverPhone, err)
-		return nil, fmt.Errorf("查询失败: %v", err)
+		return nil, fmt.Errorf("查询失败，请稍后重试")
 	}
 	if driverUser == nil {
 		l.Errorf("司机不存在, phone=%s", in.DriverPhone)

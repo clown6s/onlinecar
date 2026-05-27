@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"onlinecar-gateway/common/ctxdata"
+	"onlinecar-gateway/common/errorx"
 	"onlinecar-gateway/internal/svc"
 	"onlinecar-gateway/internal/types"
 	passengerpb "onlinecar-gateway/pb/passenger"
@@ -37,7 +38,7 @@ func (l *CreateTripLogic) CreateTrip(req *types.CreateTripReq) (*types.TripResp,
 	})
 	if err != nil {
 		l.Errorf("PassengerRpc.CreateTrip 失败, passengerId=%d, err=%v", uid, err)
-		return nil, err
+		return nil, errorx.MapRpcError(err)
 	}
 
 	l.Infof("行程创建成功, tripId=%d, passengerId=%d", resp.Id, uid)

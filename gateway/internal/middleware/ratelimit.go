@@ -25,9 +25,10 @@ type RateLimitMiddleware struct {
 	limiters        map[string]*ipLimiter
 	cleanupInterval time.Duration
 	maxIdle         time.Duration // IP 无请求多久后清理
+	trustedSubnets  []*net.IPNet  // 可信代理网段
 }
 
-func NewRateLimitMiddleware(r int) *RateLimitMiddleware {
+func NewRateLimitMiddleware(r int, trustedSubnets ...string) *RateLimitMiddleware {
 	if r <= 0 {
 		r = 1
 	}
@@ -39,8 +40,40 @@ func NewRateLimitMiddleware(r int) *RateLimitMiddleware {
 		cleanupInterval: 5 * time.Minute,
 		maxIdle:         10 * time.Minute,
 	}
+	// 解析可信代理网段（CIDR 格式）
+	for _, cidr := range trustedSubnets {
+		_, network, err := net.ParseCIDR(cidr)
+		if err == nil {
+			m.trustedSubnets = append(m.trustedSubnets, network)
+		} else {
+			logx.Errorf("[RATELIMIT] 解析可信代理网段失败, cidr=%s, err=%v", cidr, err)
+		}
+	}
 	go m.cleanupLoop()
 	return m
+}
+
+// isTrustedProxy 检查请求来源 IP 是否属于可信代理网段
+func (m *RateLimitMiddleware) isTrustedProxy(remoteAddr string) bool {
+	if len(m.trustedSubnets) == 0 {
+		// 未配置可信代理时，不信任任何代理头
+		return false
+	}
+	// 去除端口号
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		host = remoteAddr
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	for _, network := range m.trustedSubnets {
+		if network.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *RateLimitMiddleware) getLimiter(ip string) *ipLimiter {
@@ -54,6 +87,8 @@ func (m *RateLimitMiddleware) getLimiter(ip string) *ipLimiter {
 			lastRef: time.Now(),
 		}
 		m.limiters[ip] = limiter
+	} else {
+		limiter.lastRef = time.Now()
 	}
 	return limiter
 }
@@ -80,38 +115,59 @@ func (m *RateLimitMiddleware) cleanupLoop() {
 	}
 }
 
-// GetClientIP 获取客户端真实 IP，支持 X-Forwarded-For 和 X-Real-IP
-func GetClientIP(r *http.Request) string {
-	// 优先 X-Real-IP（Nginx 常用）
-	if ip := r.Header.Get("X-Real-IP"); ip != "" {
-		if net.ParseIP(ip) != nil {
-			return ip
+// GetClientIP 获取客户端真实 IP
+// 仅当请求来源属于可信代理网段时，才使用 X-Real-IP / X-Forwarded-For 头
+// 否则直接使用 RemoteAddr，防止客户端伪造代理头绕过限流
+func GetClientIP(r *http.Request, trustedSubnets ...*net.IPNet) string {
+	isTrusted := len(trustedSubnets) > 0
+	if isTrusted {
+		// 去除端口号
+		host, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			host = r.RemoteAddr
+		}
+		ip := net.ParseIP(host)
+		if ip != nil {
+			isTrusted = false
+			for _, network := range trustedSubnets {
+				if network.Contains(ip) {
+					isTrusted = true
+					break
+				}
+			}
 		}
 	}
-	// 其次 X-Forwarded-For（取第一个合法 IP）
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		if idx := strings.IndexByte(xff, ','); idx >= 0 {
-			ip := strings.TrimSpace(xff[:idx])
+
+	if isTrusted {
+		// 优先 X-Real-IP（Nginx 常用）
+		if ip := r.Header.Get("X-Real-IP"); ip != "" {
 			if net.ParseIP(ip) != nil {
 				return ip
 			}
-		} else {
-			if net.ParseIP(strings.TrimSpace(xff)) != nil {
-				return strings.TrimSpace(xff)
+		}
+		// 其次 X-Forwarded-For（取第一个合法 IP）
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			if idx := strings.IndexByte(xff, ','); idx >= 0 {
+				ip := strings.TrimSpace(xff[:idx])
+				if net.ParseIP(ip) != nil {
+					return ip
+				}
+			} else {
+				if net.ParseIP(strings.TrimSpace(xff)) != nil {
+					return strings.TrimSpace(xff)
+				}
 			}
 		}
 	}
+
+	// 不可信来源或无代理头时，直接使用 RemoteAddr
 	return r.RemoteAddr
 }
 
 func (m *RateLimitMiddleware) Handle(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ip := GetClientIP(r)
+		ip := GetClientIP(r, m.trustedSubnets...)
 		limiter := m.getLimiter(ip)
-
-		m.mu.Lock()
-		limiter.lastRef = time.Now()
-		m.mu.Unlock()
 
 		if limiter.limiter.Allow() {
 			next(w, r)

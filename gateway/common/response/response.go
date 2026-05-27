@@ -25,7 +25,7 @@ func Response(w http.ResponseWriter, resp any, err error) {
 			httpx.WriteJson(w, codeErr.HttpCode(), body)
 		} else {
 			body.Code = -1
-			body.Msg = err.Error()
+			body.Msg = "服务器内部错误，请稍后重试"
 			httpx.WriteJson(w, http.StatusInternalServerError, body)
 		}
 		return

@@ -24,6 +24,7 @@ type (
 		InsertWithConn(ctx context.Context, session sqlx.Session, data *Trip) (sql.Result, error)
 		FindOne(ctx context.Context, id int64) (*Trip, error)
 		FindByPassengerId(ctx context.Context, passengerId int64, page, pageSize int) ([]*Trip, error)
+		FindByPassengerIdAndStatus(ctx context.Context, passengerId int64, status int8, page, pageSize int) ([]*Trip, error)
 		Update(ctx context.Context, data *Trip) error
 	}
 
@@ -116,6 +117,25 @@ func (m *defaultTripModel) FindByPassengerId(ctx context.Context, passengerId in
 		strings.Join(tripFieldNames, ","), m.table)
 	var resp []*Trip
 	err := m.conn.QueryRowsCtx(ctx, &resp, query, passengerId, pageSize, offset)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (m *defaultTripModel) FindByPassengerIdAndStatus(ctx context.Context, passengerId int64, status int8, page, pageSize int) ([]*Trip, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 50 {
+		pageSize = 20
+	}
+	offset := (page - 1) * pageSize
+
+	query := fmt.Sprintf("SELECT %s FROM %s WHERE `passenger_id` = ? AND `status` = ? ORDER BY `id` DESC LIMIT ? OFFSET ?",
+		strings.Join(tripFieldNames, ","), m.table)
+	var resp []*Trip
+	err := m.conn.QueryRowsCtx(ctx, &resp, query, passengerId, status, pageSize, offset)
 	if err != nil {
 		return nil, err
 	}
