@@ -1,6 +1,7 @@
 package svc
 
 import (
+	"onlinecar-gateway/common/cache"
 	"onlinecar-gateway/common/sms"
 	"onlinecar-gateway/internal/config"
 	districtpb "onlinecar-gateway/pb/district"
@@ -22,6 +23,7 @@ type ServiceContext struct {
 	DistrictConn  *grpc.ClientConn
 	Redis         *redis.Redis
 	SmsSender     sms.SmsSender
+	ProvinceCache *cache.ProvinceCache
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -29,15 +31,18 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	passengerConn := zrpc.MustNewClient(c.PassengerRpc)
 	districtConn := zrpc.MustNewClient(c.DistrictRpc)
 
+	districtClient := districtpb.NewDistrictServiceClient(districtConn.Conn())
+
 	return &ServiceContext{
 		Config:        c,
 		DriverRpc:     driverpb.NewDriverClient(driverConn.Conn()),
 		PassengerRpc:  passengerpb.NewPassengerClient(passengerConn.Conn()),
-		DistrictRpc:   districtpb.NewDistrictServiceClient(districtConn.Conn()),
+		DistrictRpc:   districtClient,
 		DriverConn:    driverConn.Conn(),
 		PassengerConn: passengerConn.Conn(),
 		DistrictConn:  districtConn.Conn(),
 		Redis:         redis.MustNewRedis(c.RedisConf),
 		SmsSender:     sms.NewMockSmsSender(),
+		ProvinceCache: cache.NewProvinceCache(districtClient, 0), // 默认 10 分钟刷新
 	}
 }

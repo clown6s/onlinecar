@@ -22,8 +22,15 @@ func (m *AccessLogMiddleware) Handle(next http.HandlerFunc) http.HandlerFunc {
 
 		duration := time.Since(start)
 		rid := r.Header.Get("X-Request-ID")
-		logx.Infof("[ACCESS] method=%s path=%s status=%d duration=%v remote=%s request_id=%s",
-			r.Method, r.URL.Path, rw.statusCode, duration, r.RemoteAddr, rid)
+
+		// 慢请求（>200ms）或非 2xx 响应才打 Info，其余 Debug
+		if duration > 200*time.Millisecond || rw.statusCode >= 300 {
+			logx.Infof("[ACCESS] method=%s path=%s status=%d duration=%v remote=%s request_id=%s",
+				r.Method, r.URL.Path, rw.statusCode, duration, r.RemoteAddr, rid)
+		} else {
+			logx.Slowf("[ACCESS] method=%s path=%s status=%d duration=%v remote=%s request_id=%s",
+				r.Method, r.URL.Path, rw.statusCode, duration, r.RemoteAddr, rid)
+		}
 	}
 }
 

@@ -23,27 +23,7 @@ func NewGetProvincesLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetP
 }
 
 func (l *GetProvincesLogic) GetProvinces() ([]*types.DistrictNodeResp, error) {
-	l.Info("Gateway->DistrictRpc.GetProvinces")
-
-	resp, err := l.svcCtx.DistrictRpc.GetProvinces(l.ctx, &districtpb.GetProvincesReq{})
-	if err != nil {
-		l.Errorf("DistrictRpc.GetProvinces 失败, err=%v", err)
-		return nil, errorx.MapRpcError(err)
-	}
-
-	list := make([]*types.DistrictNodeResp, 0, len(resp.List))
-	for _, node := range resp.List {
-		list = append(list, &types.DistrictNodeResp{
-			Id:     node.Id,
-			AdCode: node.AdCode,
-			Name:   node.Name,
-			Level:  node.Level,
-			Center: node.Center,
-		})
-	}
-
-	l.Infof("查询省级行政区成功, count=%d", len(list))
-	return list, nil
+	return l.svcCtx.ProvinceCache.Get(l.ctx)
 }
 
 type GetChildrenLogic struct {
@@ -58,14 +38,11 @@ func NewGetChildrenLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetCh
 
 // GetChildren 获取子级行政区
 func (l *GetChildrenLogic) GetChildren(parentAdCode string) ([]*types.DistrictNodeResp, error) {
-	// string -> uint32
 	code, err := strconv.ParseUint(parentAdCode, 10, 32)
 	if err != nil {
 		l.Errorf("parentAdCode 格式错误, value=%s, err=%v", parentAdCode, err)
 		return nil, errorx.NewCodeError(errorx.ErrCodeParam, "adCode格式错误")
 	}
-
-	l.Infof("Gateway->DistrictRpc.GetChildren, parentAdCode=%d", uint32(code))
 
 	resp, err := l.svcCtx.DistrictRpc.GetChildren(l.ctx, &districtpb.GetChildrenReq{
 		ParentAdCode: uint32(code),
@@ -86,6 +63,5 @@ func (l *GetChildrenLogic) GetChildren(parentAdCode string) ([]*types.DistrictNo
 		})
 	}
 
-	l.Infof("查询子级行政区成功, parentAdCode=%d, count=%d", uint32(code), len(list))
 	return list, nil
 }

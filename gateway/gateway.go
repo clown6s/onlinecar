@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"path/filepath"
 	"runtime"
@@ -31,6 +32,9 @@ func main() {
 	defer server.Stop()
 
 	ctx := svc.NewServiceContext(c)
+	ctx.ProvinceCache.Start(context.Background())
+	defer ctx.ProvinceCache.Stop()
+
 	handler.RegisterHandlers(server, ctx)
 
 	logx.Infof("Starting gateway at %s:%d...", c.Host, c.Port)
