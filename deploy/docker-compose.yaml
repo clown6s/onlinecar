@@ -3,11 +3,10 @@ name: onlinecar
 services:
   # ========== 基础设施 ==========
 
-  # etcd 3 节点集群
+  # etcd 3 节点集群（认证由 etcd-setup 初始化）
   etcd-1:
     image: quay.io/coreos/etcd:v3.6.9
     environment:
-      ALLOW_NONE_AUTHENTICATION: "yes"
       ETCD_NAME: etcd1
       ETCD_INITIAL_ADVERTISE_PEER_URLS: http://etcd-1:2380
       ETCD_LISTEN_PEER_URLS: http://0.0.0.0:2380
@@ -15,14 +14,15 @@ services:
       ETCD_ADVERTISE_CLIENT_URLS: http://etcd-1:2379
       ETCD_INITIAL_CLUSTER: etcd1=http://etcd-1:2380,etcd2=http://etcd-2:2380,etcd3=http://etcd-3:2380
       ETCD_CLUSTER_STATE: new
-    ports:
-      - "2379:2379"
+    # 端口不暴露到宿主机，仅容器内网络可访问
+    # ports:
+    #   - "2379:2379"
     volumes:
       - etcd1_data:/etcd-data
     networks:
       - onlinecar
     healthcheck:
-      test: ["CMD", "etcdctl", "endpoint", "health", "--endpoints=http://localhost:2379"]
+      test: ["CMD-SHELL", "kill -0 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -41,7 +41,6 @@ services:
   etcd-2:
     image: quay.io/coreos/etcd:v3.6.9
     environment:
-      ALLOW_NONE_AUTHENTICATION: "yes"
       ETCD_NAME: etcd2
       ETCD_INITIAL_ADVERTISE_PEER_URLS: http://etcd-2:2380
       ETCD_LISTEN_PEER_URLS: http://0.0.0.0:2380
@@ -54,7 +53,7 @@ services:
     networks:
       - onlinecar
     healthcheck:
-      test: ["CMD", "etcdctl", "endpoint", "health", "--endpoints=http://localhost:2379"]
+      test: ["CMD-SHELL", "kill -0 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -73,7 +72,6 @@ services:
   etcd-3:
     image: quay.io/coreos/etcd:v3.6.9
     environment:
-      ALLOW_NONE_AUTHENTICATION: "yes"
       ETCD_NAME: etcd3
       ETCD_INITIAL_ADVERTISE_PEER_URLS: http://etcd-3:2380
       ETCD_LISTEN_PEER_URLS: http://0.0.0.0:2380
@@ -86,7 +84,7 @@ services:
     networks:
       - onlinecar
     healthcheck:
-      test: ["CMD", "etcdctl", "endpoint", "health", "--endpoints=http://localhost:2379"]
+      test: ["CMD-SHELL", "kill -0 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -209,9 +207,8 @@ services:
   # Loki 日志存储
   loki:
     image: grafana/loki:3.5.1
-    # 端口不暴露到宿主机，仅 Promtail 容器内访问
-    # ports:
-    #   - "3100:3100"
+    ports:
+      - "3100:3100"
     volumes:
       - loki_data:/loki
     networks:
@@ -256,6 +253,46 @@ services:
         max-size: "50m"
         max-file: "3"
 
+  # Grafana 可视化
+  grafana:
+    image: grafana/grafana:11.5.2
+    container_name: onlinecar-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+    environment:
+      TZ: Asia/Shanghai
+      GF_SECURITY_ADMIN_PASSWORD: "admin@zzp"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DEFAULT_LANGUAGE: "zh-Hans"
+    depends_on:
+      loki:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+    networks:
+      - onlinecar
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
   # 日志目录权限初始化（一次性任务，chown 给 UID 1000）
   log-init:
     image: alpine:3.19
@@ -269,6 +306,39 @@ services:
       options:
         max-size: "10m"
         max-file: "1"
+
+  # etcd 认证初始化（一次性任务，创建用户并启用认证）
+  etcd-setup:
+    image: quay.io/coreos/etcd:v3.6.9
+    depends_on:
+      etcd-1:
+        condition: service_healthy
+      etcd-2:
+        condition: service_healthy
+      etcd-3:
+        condition: service_healthy
+    networks:
+      - onlinecar
+    entrypoint: >
+      sh -c "
+        ENDPOINTS=http://etcd-1:2379,http://etcd-2:2379,http://etcd-3:2379 &&
+        echo '>>> Setting root password...' &&
+        etcdctl --endpoints=$$ENDPOINTS user passwd root --new-user-password='OnlineCar@2026#Etcd' &&
+        echo '>>> Creating onlinecar user...' &&
+        etcdctl --endpoints=$$ENDPOINTS user add onlinecar --new-user-password='OnlineCar@2026#EtcdApp' &&
+        echo '>>> Creating role and granting permissions...' &&
+        etcdctl --endpoints=$$ENDPOINTS role add onlinecar-role &&
+        etcdctl --endpoints=$$ENDPOINTS role grant-permission onlinecar-role readwrite '' &&
+        etcdctl --endpoints=$$ENDPOINTS user grant onlinecar onlinecar-role &&
+        echo '>>> Enabling auth...' &&
+        etcdctl --endpoints=$$ENDPOINTS auth enable &&
+        echo '>>> etcd auth setup completed!'
+      "
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "2"
 
   # ========== 业务服务 ==========
   driver:
@@ -287,12 +357,8 @@ services:
     depends_on:
       log-init:
         condition: service_completed_successfully
-      etcd-1:
-        condition: service_healthy
-      etcd-2:
-        condition: service_healthy
-      etcd-3:
-        condition: service_healthy
+      etcd-setup:
+        condition: service_completed_successfully
       mysql:
         condition: service_healthy
       redis:
@@ -305,6 +371,12 @@ services:
     networks:
       - onlinecar
     restart: on-failure
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "6000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     deploy:
       resources:
         limits:
@@ -335,12 +407,8 @@ services:
     depends_on:
       log-init:
         condition: service_completed_successfully
-      etcd-1:
-        condition: service_healthy
-      etcd-2:
-        condition: service_healthy
-      etcd-3:
-        condition: service_healthy
+      etcd-setup:
+        condition: service_completed_successfully
       mysql:
         condition: service_healthy
       redis:
@@ -353,6 +421,12 @@ services:
     networks:
       - onlinecar
     restart: on-failure
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "6001"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     deploy:
       resources:
         limits:
@@ -377,17 +451,13 @@ services:
       OTEL_SERVICE_NAME: gateway-api
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
       OTEL_TRACES_SAMPLER: always_on
-      JWT_DRIVER_SECRET: "oc-drv-a3f8e2c1d9b45678prod2026"
-      JWT_PASSENGER_SECRET: "oc-pax-7e1b9c4f2a8d5678prod2026"
+      ONLINECAR_DRIVER_JWT_SECRET: "oc-drv-a3f8e2c1d9b45678prod2026"
+      ONLINECAR_PASSENGER_JWT_SECRET: "oc-pax-7e1b9c4f2a8d5678prod2026"
     depends_on:
       log-init:
         condition: service_completed_successfully
-      etcd-1:
-        condition: service_healthy
-      etcd-2:
-        condition: service_healthy
-      etcd-3:
-        condition: service_healthy
+      etcd-setup:
+        condition: service_completed_successfully
       driver:
         condition: service_started
       passenger:
@@ -422,6 +492,7 @@ volumes:
   redis_data:
   loki_data:
   jaeger_data:
+  grafana_data:
   onlinecar_logs:
   promtail_positions:
 

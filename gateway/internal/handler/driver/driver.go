@@ -3,7 +3,9 @@ package driver
 import (
 	"net/http"
 
+	"onlinecar-gateway/common/errorx"
 	"onlinecar-gateway/common/response"
+	"onlinecar-gateway/common/validate"
 	driverlogic "onlinecar-gateway/internal/logic/driver"
 	"onlinecar-gateway/internal/svc"
 	"onlinecar-gateway/internal/types"
@@ -15,7 +17,11 @@ func RegisterHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req types.DriverRegisterReq
 		if err := httpx.Parse(r, &req); err != nil {
-			response.Error(w, 400, err.Error())
+			response.Error(w, http.StatusBadRequest, errorx.ErrCodeParam, err.Error())
+			return
+		}
+		if !validate.IsValidPhone(req.Phone) {
+			response.Errorx(w, errorx.ErrPhoneFormat)
 			return
 		}
 		l := driverlogic.NewRegisterLogic(r.Context(), svcCtx)
@@ -28,7 +34,11 @@ func LoginHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req types.DriverLoginReq
 		if err := httpx.Parse(r, &req); err != nil {
-			response.Error(w, 400, err.Error())
+			response.Error(w, http.StatusBadRequest, errorx.ErrCodeParam, err.Error())
+			return
+		}
+		if !validate.IsValidPhone(req.Phone) {
+			response.Errorx(w, errorx.ErrPhoneFormat)
 			return
 		}
 		l := driverlogic.NewLoginLogic(r.Context(), svcCtx)
@@ -41,7 +51,7 @@ func UpdateLocationHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req types.DriverLocationReq
 		if err := httpx.Parse(r, &req); err != nil {
-			response.Error(w, 400, err.Error())
+			response.Error(w, http.StatusBadRequest, errorx.ErrCodeParam, err.Error())
 			return
 		}
 		l := driverlogic.NewUpdateLocationLogic(r.Context(), svcCtx)

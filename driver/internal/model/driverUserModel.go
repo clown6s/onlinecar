@@ -26,8 +26,10 @@ var (
 type (
 	DriverUserModel interface {
 		Insert(ctx context.Context, data *DriverUser) (sql.Result, error)
+		InsertWithConn(ctx context.Context, session sqlx.Session, data *DriverUser) (sql.Result, error)
 		FindOne(ctx context.Context, id int64) (*DriverUser, error)
 		FindByPhone(ctx context.Context, phone string) (*DriverUser, error)
+		FindByPhoneWithConn(ctx context.Context, session sqlx.Session, phone string) (*DriverUser, error)
 		Update(ctx context.Context, data *DriverUser) error
 		Delete(ctx context.Context, id int64) error
 	}
@@ -146,4 +148,39 @@ func (m *defaultDriverUserModel) Delete(ctx context.Context, id int64) error {
 	query := fmt.Sprintf("DELETE FROM %s WHERE `id` = ?", m.table)
 	_, err := m.conn.ExecCtx(ctx, query, id)
 	return err
+}
+
+// InsertWithConn 使用指定 session 执行插入（事务内使用）
+func (m *defaultDriverUserModel) InsertWithConn(ctx context.Context, session sqlx.Session, data *DriverUser) (sql.Result, error) {
+	now := time.Now()
+	data.GmtCreate = &now
+	data.GmtModified = &now
+
+	query := fmt.Sprintf(
+		"INSERT INTO %s (`address`,`driver_name`,`driver_phone`,`driver_gender`,`driver_birthday`,`driver_nation`,`driver_contact_address`,`license_id`,`get_driver_license_date`,`driver_license_on`,`driver_license_off`,`taxi_driver`,`certificate_no`,`network_car_issue_organization`,`network_car_issue_date`,`get_network_car_proof_date`,`network_car_proof_on`,`network_car_proof_off`,`register_date`,`commercial_type`,`contract_company`,`contract_on`,`contract_off`,`state`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+		m.table,
+	)
+	ret, err := session.ExecCtx(ctx, query,
+		data.Address, data.DriverName, data.DriverPhone, data.DriverGender, data.DriverBirthday,
+		data.DriverNation, data.DriverContactAddress, data.LicenseId, data.GetDriverLicenseDate,
+		data.DriverLicenseOn, data.DriverLicenseOff, data.TaxiDriver, data.CertificateNo,
+		data.NetworkCarIssueOrganization, data.NetworkCarIssueDate, data.GetNetworkCarProofDate,
+		data.NetworkCarProofOn, data.NetworkCarProofOff, data.RegisterDate, data.CommercialType,
+		data.ContractCompany, data.ContractOn, data.ContractOff, data.State,
+	)
+	return ret, err
+}
+
+// FindByPhoneWithConn 使用指定 session 查询（事务内使用）
+func (m *defaultDriverUserModel) FindByPhoneWithConn(ctx context.Context, session sqlx.Session, phone string) (*DriverUser, error) {
+	query := fmt.Sprintf("SELECT %s FROM %s WHERE `driver_phone` = ? LIMIT 1", strings.Join(driverUserFieldNames, ","), m.table)
+	var resp DriverUser
+	err := session.QueryRowCtx(ctx, &resp, query, phone)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &resp, nil
 }

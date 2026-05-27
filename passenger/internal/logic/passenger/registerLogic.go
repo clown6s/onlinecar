@@ -9,6 +9,7 @@ import (
 	"onlinecar-passenger/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
+	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
 type RegisterLogic struct {
@@ -25,37 +26,47 @@ func NewRegisterLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Register
 	}
 }
 
-// 注册乘客
+// 注册乘客（事务：检查手机号 + 插入乘客）
 func (l *RegisterLogic) Register(in *pb.RegisterReq) (*pb.RegisterResp, error) {
 	l.Infof("乘客注册, phone=%s, name=%s", in.PassengerPhone, in.PassengerName)
-
-	// 检查手机号是否已注册
-	existing, err := l.svcCtx.PassengerUserModel.FindByPhone(l.ctx, in.PassengerPhone)
-	if err != nil {
-		l.Errorf("查询乘客失败, phone=%s, err=%v", in.PassengerPhone, err)
-		return nil, fmt.Errorf("查询失败: %v", err)
-	}
-	if existing != nil {
-		l.Errorf("手机号已注册, phone=%s", in.PassengerPhone)
-		return nil, fmt.Errorf("该手机号已注册")
-	}
 
 	state := int8(0) // 有效
 	gender := int8(in.PassengerGender)
 
-	passengerUser := &model.PassengerUser{
-		PassengerPhone:  &in.PassengerPhone,
-		PassengerName:   &in.PassengerName,
-		PassengerGender: &gender,
-		State:           &state,
-	}
+	var passengerId int64
 
-	result, err := l.svcCtx.PassengerUserModel.Insert(l.ctx, passengerUser)
+	err := l.svcCtx.Conn.TransactCtx(l.ctx, func(ctx context.Context, session sqlx.Session) error {
+		// 事务内检查手机号是否已注册（避免 TOCTOU 竞态）
+		existing, err := l.svcCtx.PassengerUserModel.FindByPhoneWithConn(ctx, session, in.PassengerPhone)
+		if err != nil {
+			return fmt.Errorf("查询乘客失败: %w", err)
+		}
+		if existing != nil {
+			return fmt.Errorf("该手机号已注册")
+		}
+
+		passengerUser := &model.PassengerUser{
+			PassengerPhone:  &in.PassengerPhone,
+			PassengerName:   &in.PassengerName,
+			PassengerGender: &gender,
+			State:           &state,
+		}
+
+		result, err := l.svcCtx.PassengerUserModel.InsertWithConn(ctx, session, passengerUser)
+		if err != nil {
+			return fmt.Errorf("插入乘客失败: %w", err)
+		}
+		id, err := result.LastInsertId()
+		if err != nil {
+			return fmt.Errorf("获取乘客ID失败: %w", err)
+		}
+		passengerId = id
+		return nil
+	})
 	if err != nil {
-		l.Errorf("插入乘客失败, phone=%s, err=%v", in.PassengerPhone, err)
-		return nil, fmt.Errorf("注册失败: %v", err)
+		l.Errorf("乘客注册事务失败, phone=%s, err=%v", in.PassengerPhone, err)
+		return nil, err
 	}
-	passengerId, _ := result.LastInsertId()
 
 	l.Infof("乘客注册成功, passengerId=%d", passengerId)
 	return &pb.RegisterResp{

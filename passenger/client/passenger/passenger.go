@@ -14,6 +14,8 @@ import (
 )
 
 type (
+	CheckPhoneReq   = pb.CheckPhoneReq
+	CheckPhoneResp  = pb.CheckPhoneResp
 	CreateTripReq   = pb.CreateTripReq
 	GetPassengerReq = pb.GetPassengerReq
 	LoginReq        = pb.LoginReq
@@ -32,6 +34,8 @@ type (
 		GetPassenger(ctx context.Context, in *GetPassengerReq, opts ...grpc.CallOption) (*PassengerInfo, error)
 		// 创建行程
 		CreateTrip(ctx context.Context, in *CreateTripReq, opts ...grpc.CallOption) (*TripResp, error)
+		// 检查手机号是否注册
+		CheckPhone(ctx context.Context, in *CheckPhoneReq, opts ...grpc.CallOption) (*CheckPhoneResp, error)
 	}
 
 	defaultPassenger struct {
@@ -67,4 +71,10 @@ func (m *defaultPassenger) GetPassenger(ctx context.Context, in *GetPassengerReq
 func (m *defaultPassenger) CreateTrip(ctx context.Context, in *CreateTripReq, opts ...grpc.CallOption) (*TripResp, error) {
 	client := pb.NewPassengerClient(m.cli.Conn())
 	return client.CreateTrip(ctx, in, opts...)
+}
+
+// 检查手机号是否注册
+func (m *defaultPassenger) CheckPhone(ctx context.Context, in *CheckPhoneReq, opts ...grpc.CallOption) (*CheckPhoneResp, error) {
+	client := pb.NewPassengerClient(m.cli.Conn())
+	return client.CheckPhone(ctx, in, opts...)
 }

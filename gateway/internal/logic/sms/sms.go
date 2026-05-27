@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"onlinecar-gateway/common/errorx"
+	"onlinecar-gateway/common/validate"
 	"onlinecar-gateway/internal/svc"
 	driverpb "onlinecar-gateway/pb/driver"
 	passengerpb "onlinecar-gateway/pb/passenger"
@@ -96,10 +97,17 @@ func (l *SendSmsLogic) checkPhoneExists(phone string) error {
 }
 
 // VerifyCode 校验验证码，成功后自动删除（防重放）
-func VerifyCode(ctx context.Context, rds *svc.ServiceContext, role, phone, code string) error {
+func VerifyCode(ctx context.Context, svcCtx *svc.ServiceContext, role, phone, code string) error {
+	if !validate.IsValidPhone(phone) {
+		return errorx.ErrPhoneFormat
+	}
+	if code == "" {
+		return errorx.ErrParam
+	}
+
 	codeKey := fmt.Sprintf("%s%s:%s", codePrefix, role, phone)
 
-	stored, err := rds.Redis.Get(codeKey)
+	stored, err := svcCtx.Redis.Get(codeKey)
 	if err != nil || stored == "" {
 		return errorx.ErrSmsCodeExpired
 	}
@@ -108,7 +116,9 @@ func VerifyCode(ctx context.Context, rds *svc.ServiceContext, role, phone, code 
 		return errorx.ErrSmsCodeError
 	}
 
-	// 删除已使用的验证码
-	rds.Redis.Del(codeKey)
+	// 删除已使用的验证码（防重放）
+	if _, err := svcCtx.Redis.Del(codeKey); err != nil {
+		logx.Errorf("[SMS] Redis.Del 验证码失败, key=%s, err=%v", codeKey, err)
+	}
 	return nil
 }

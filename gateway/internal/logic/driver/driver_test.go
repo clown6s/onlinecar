@@ -6,11 +6,13 @@ import (
 	"time"
 
 	"onlinecar-gateway/common/ctxdata"
+	"onlinecar-gateway/common/sms"
 	"onlinecar-gateway/internal/config"
 	"onlinecar-gateway/internal/svc"
 	"onlinecar-gateway/internal/types"
 	driverpb "onlinecar-gateway/pb/driver"
 
+	"github.com/zeromicro/go-zero/core/stores/redis"
 	"google.golang.org/grpc"
 )
 
@@ -53,6 +55,10 @@ func (m *mockDriverClient) UpdateDriverWorkStatus(ctx context.Context, in *drive
 	return nil, nil
 }
 
+func (m *mockDriverClient) CheckPhone(ctx context.Context, in *driverpb.CheckPhoneReq, opts ...grpc.CallOption) (*driverpb.CheckPhoneResp, error) {
+	return &driverpb.CheckPhoneResp{Exists: true}, nil
+}
+
 func newTestSvcCtx(client driverpb.DriverClient) *svc.ServiceContext {
 	return &svc.ServiceContext{
 		Config: config.Config{
@@ -62,6 +68,8 @@ func newTestSvcCtx(client driverpb.DriverClient) *svc.ServiceContext {
 			},
 		},
 		DriverRpc: client,
+		Redis:     redis.Nil, // 使用 nil Redis（mock 模式）
+		SmsSender: sms.NewMockSmsSender(),
 	}
 }
 
@@ -91,14 +99,15 @@ func TestRegisterLogic_Success(t *testing.T) {
 
 func TestLoginLogic_Success(t *testing.T) {
 	ctx := context.Background()
-	mockClient := &mockDriverClient{
-		loginFunc: func(ctx context.Context, in *driverpb.LoginReq, opts ...grpc.CallOption) (*driverpb.LoginResp, error) {
-			return &driverpb.LoginResp{Id: 1, DriverName: "张三", State: 0}, nil
-		},
-	}
 
-	logic := NewLoginLogic(ctx, newTestSvcCtx(mockClient))
-	resp, err := logic.Login(&types.DriverLoginReq{Phone: "13800000001"})
+	// 先发验证码（写入 Redis）
+	svcCtx := newTestSvcCtx(&mockDriverClient{})
+	codeKey := "sms:code:driver:13800000001"
+	svcCtx.Redis.Setex(codeKey, "123456", 300)
+
+	// 再登录
+	logic := NewLoginLogic(ctx, svcCtx)
+	resp, err := logic.Login(&types.DriverLoginReq{Phone: "13800000001", Code: "123456"})
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -107,6 +116,19 @@ func TestLoginLogic_Success(t *testing.T) {
 	}
 	if resp["token"] == nil || resp["token"].(string) == "" {
 		t.Error("expected non-empty token")
+	}
+}
+
+func TestLoginLogic_WrongCode(t *testing.T) {
+	ctx := context.Background()
+	svcCtx := newTestSvcCtx(&mockDriverClient{})
+	codeKey := "sms:code:driver:13800000001"
+	svcCtx.Redis.Setex(codeKey, "123456", 300)
+
+	logic := NewLoginLogic(ctx, svcCtx)
+	_, err := logic.Login(&types.DriverLoginReq{Phone: "13800000001", Code: "654321"})
+	if err == nil {
+		t.Fatal("expected error for wrong code, got nil")
 	}
 }
 

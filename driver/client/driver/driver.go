@@ -14,6 +14,8 @@ import (
 )
 
 type (
+	CheckPhoneReq             = pb.CheckPhoneReq
+	CheckPhoneResp            = pb.CheckPhoneResp
 	DriverInfo                = pb.DriverInfo
 	DriverWorkStatusInfo      = pb.DriverWorkStatusInfo
 	Empty                     = pb.Empty
@@ -39,6 +41,8 @@ type (
 		GetDriverWorkStatus(ctx context.Context, in *GetDriverWorkStatusReq, opts ...grpc.CallOption) (*DriverWorkStatusInfo, error)
 		// 更新司机状态
 		UpdateDriverWorkStatus(ctx context.Context, in *UpdateDriverWorkStatusReq, opts ...grpc.CallOption) (*Empty, error)
+		// 检查手机号是否注册
+		CheckPhone(ctx context.Context, in *CheckPhoneReq, opts ...grpc.CallOption) (*CheckPhoneResp, error)
 	}
 
 	defaultDriver struct {
@@ -86,4 +90,10 @@ func (m *defaultDriver) GetDriverWorkStatus(ctx context.Context, in *GetDriverWo
 func (m *defaultDriver) UpdateDriverWorkStatus(ctx context.Context, in *UpdateDriverWorkStatusReq, opts ...grpc.CallOption) (*Empty, error) {
 	client := pb.NewDriverClient(m.cli.Conn())
 	return client.UpdateDriverWorkStatus(ctx, in, opts...)
+}
+
+// 检查手机号是否注册
+func (m *defaultDriver) CheckPhone(ctx context.Context, in *CheckPhoneReq, opts ...grpc.CallOption) (*CheckPhoneResp, error) {
+	client := pb.NewDriverClient(m.cli.Conn())
+	return client.CheckPhone(ctx, in, opts...)
 }

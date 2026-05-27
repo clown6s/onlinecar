@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 	"time"
@@ -45,10 +46,10 @@ func NewDriverWorkStatusModel(conn sqlx.SqlConn) DriverWorkStatusModel {
 func (m *defaultDriverWorkStatusModel) Upsert(ctx context.Context, driverId, workStatus int64) error {
 	now := time.Now()
 	query := fmt.Sprintf(
-		"INSERT INTO %s (`id`,`driver_id`,`work_status`,`gmt_create`,`gmt_modified`) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE `work_status`=?,`gmt_modified`=?",
+		"INSERT INTO %s (`driver_id`,`work_status`,`gmt_create`,`gmt_modified`) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE `work_status`=?,`gmt_modified`=?",
 		m.table,
 	)
-	_, err := m.conn.ExecCtx(ctx, query, driverId, driverId, workStatus, now, now, workStatus, now)
+	_, err := m.conn.ExecCtx(ctx, query, driverId, workStatus, now, now, workStatus, now)
 	return err
 }
 
@@ -57,7 +58,10 @@ func (m *defaultDriverWorkStatusModel) FindByDriverId(ctx context.Context, drive
 	var resp DriverWorkStatus
 	err := m.conn.QueryRowCtx(ctx, &resp, query, driverId)
 	if err != nil {
-		return nil, nil
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
 	}
 	return &resp, nil
 }

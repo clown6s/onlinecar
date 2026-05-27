@@ -21,7 +21,7 @@ func (m *PanicRecoveryMiddleware) Handle(next http.HandlerFunc) http.HandlerFunc
 		defer func() {
 			if rec := recover(); rec != nil {
 				logx.Errorf("panic recovered: %v\n%s", rec, debug.Stack())
-				response.Error(w, errorx.ErrServer.Code, errorx.ErrServer.Msg)
+				response.Errorx(w, errorx.ErrServer)
 			}
 		}()
 		next(w, r)

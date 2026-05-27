@@ -1,6 +1,9 @@
 package errorx
 
-import "fmt"
+import (
+	"fmt"
+	"net/http"
+)
 
 type CodeError struct {
 	Code int    `json:"code"`
@@ -15,6 +18,24 @@ func (e *CodeError) Error() string {
 	return fmt.Sprintf("code:%d, msg:%s", e.Code, e.Msg)
 }
 
+// HttpCode 返回对应的 HTTP 状态码
+func (e *CodeError) HttpCode() int {
+	switch {
+	case e.Code >= 50000:
+		return http.StatusServiceUnavailable
+	case e.Code >= 40000:
+		return http.StatusUnauthorized
+	case e.Code >= 30000:
+		return http.StatusBadRequest
+	case e.Code >= 20000:
+		return http.StatusBadRequest
+	case e.Code >= 10000:
+		return http.StatusBadRequest
+	default:
+		return http.StatusInternalServerError
+	}
+}
+
 // ========== HTTP 通用错误 ==========
 var (
 	ErrServer    = NewCodeError(500, "服务器内部错误")
@@ -26,15 +47,18 @@ var (
 
 // ========== 业务错误码 ==========
 const (
+	// 通用
+	ErrCodeParam = 400
+
 	// 用户相关 10001-10099
 	ErrCodePhoneRegistered = 10001
 	ErrCodeUserNotFound    = 10002
-	ErrCodePasswordError   = 10003
 	ErrCodeUserDisabled    = 10004
 	ErrCodeSmsCodeExpired  = 10005
 	ErrCodeSmsCodeError    = 10006
 	ErrCodeSmsSendFailed   = 10007
 	ErrCodeSmsSendFrequent = 10008
+	ErrCodePhoneFormat     = 10009
 
 	// 车辆相关 20001-20099
 	ErrCodeVehicleNotFound = 20001
@@ -61,12 +85,12 @@ var (
 	// 用户
 	ErrPhoneRegistered = NewCodeError(ErrCodePhoneRegistered, "该手机号已注册")
 	ErrUserNotFound    = NewCodeError(ErrCodeUserNotFound, "用户不存在")
-	ErrPasswordError   = NewCodeError(ErrCodePasswordError, "密码错误")
 	ErrUserDisabled    = NewCodeError(ErrCodeUserDisabled, "用户已禁用")
 	ErrSmsCodeExpired  = NewCodeError(ErrCodeSmsCodeExpired, "验证码已过期")
 	ErrSmsCodeError    = NewCodeError(ErrCodeSmsCodeError, "验证码错误")
 	ErrSmsSendFailed   = NewCodeError(ErrCodeSmsSendFailed, "发送验证码失败")
 	ErrSmsSendFrequent = NewCodeError(ErrCodeSmsSendFrequent, "发送过于频繁，请60秒后重试")
+	ErrPhoneFormat     = NewCodeError(ErrCodePhoneFormat, "手机号格式不正确")
 
 	// 车辆
 	ErrVehicleNotFound = NewCodeError(ErrCodeVehicleNotFound, "车辆不存在")

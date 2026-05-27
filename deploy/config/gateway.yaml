@@ -21,6 +21,8 @@ DriverRpc:
       - etcd-2:2379
       - etcd-3:2379
     Key: driver.rpc
+    User: onlinecar
+    Pass: "OnlineCar@2026#EtcdApp"
 
 # Passenger RPC
 PassengerRpc:
@@ -30,12 +32,20 @@ PassengerRpc:
       - etcd-2:2379
       - etcd-3:2379
     Key: passenger.rpc
+    User: onlinecar
+    Pass: "OnlineCar@2026#EtcdApp"
 
 # Redis（短信验证码存储）
 RedisConf:
   Host: redis:6379
   Pass: "OnlineCar@2026#Redis"
   Type: node
+
+# CORS（生产环境指定具体域名）
+CORS:
+  AllowOrigins:
+    - "https://app.onlinecar.com"
+    - "https://admin.onlinecar.com"
 
 # 日志（file 模式，Promtail 采集）
 Log:

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"onlinecar-gateway/common/ctxdata"
+	"onlinecar-gateway/common/errorx"
 	"onlinecar-gateway/internal/logic/sms"
 	"onlinecar-gateway/internal/svc"
 	"onlinecar-gateway/internal/types"
@@ -26,6 +27,16 @@ func NewRegisterLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Register
 
 func (l *RegisterLogic) Register(req *types.DriverRegisterReq) (*types.DriverResp, error) {
 	l.Infof("Gateway->DriverRpc.Register, phone=%s, name=%s", req.Phone, req.Name)
+
+	// 先检查手机号是否已注册
+	checkResp, err := l.svcCtx.DriverRpc.CheckPhone(l.ctx, &driverpb.CheckPhoneReq{DriverPhone: req.Phone})
+	if err != nil {
+		l.Errorf("DriverRpc.CheckPhone RPC异常, phone=%s, err=%v", req.Phone, err)
+		return nil, errorx.ErrServiceUnavailable
+	}
+	if checkResp.Exists {
+		return nil, errorx.ErrPhoneRegistered
+	}
 
 	resp, err := l.svcCtx.DriverRpc.Register(l.ctx, &driverpb.RegisterReq{
 		DriverName:     req.Name,
@@ -75,6 +86,7 @@ func (l *LoginLogic) Login(req *types.DriverLoginReq) (map[string]any, error) {
 	}
 
 	conf := l.svcCtx.Config.AuthDriver
+	secret := conf.GetAccessSecret("ONLINECAR_DRIVER_JWT_SECRET")
 	claims := jwt.MapClaims{
 		"uid":     resp.Id,
 		"subject": "driver",
@@ -82,7 +94,7 @@ func (l *LoginLogic) Login(req *types.DriverLoginReq) (map[string]any, error) {
 		"iat":     time.Now().Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenStr, err := token.SignedString([]byte(conf.AccessSecret))
+	tokenStr, err := token.SignedString([]byte(secret))
 	if err != nil {
 		l.Errorf("JWT签名失败, driverId=%d, err=%v", resp.Id, err)
 		return nil, err

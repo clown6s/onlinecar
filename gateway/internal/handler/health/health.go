@@ -46,8 +46,11 @@ func HealthHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			code = http.StatusServiceUnavailable
 		}
 
-		_ = code
-		response.Success(w, HealthResponse{Status: status, Details: details})
+		if status == "degraded" {
+			response.SuccessWithCode(w, code, HealthResponse{Status: status, Details: details})
+		} else {
+			response.Success(w, HealthResponse{Status: status, Details: details})
+		}
 	}
 }
 

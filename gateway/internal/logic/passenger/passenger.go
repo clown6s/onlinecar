@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"onlinecar-gateway/common/errorx"
 	"onlinecar-gateway/internal/logic/sms"
 	"onlinecar-gateway/internal/svc"
 	"onlinecar-gateway/internal/types"
@@ -25,6 +26,16 @@ func NewRegisterLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Register
 
 func (l *RegisterLogic) Register(req *types.PassengerRegisterReq) (*types.PassengerResp, error) {
 	l.Infof("Gateway->PassengerRpc.Register, phone=%s, name=%s", req.Phone, req.Name)
+
+	// 先检查手机号是否已注册
+	checkResp, err := l.svcCtx.PassengerRpc.CheckPhone(l.ctx, &passengerpb.CheckPhoneReq{PassengerPhone: req.Phone})
+	if err != nil {
+		l.Errorf("PassengerRpc.CheckPhone RPC异常, phone=%s, err=%v", req.Phone, err)
+		return nil, errorx.ErrServiceUnavailable
+	}
+	if checkResp.Exists {
+		return nil, errorx.ErrPhoneRegistered
+	}
 
 	resp, err := l.svcCtx.PassengerRpc.Register(l.ctx, &passengerpb.RegisterReq{
 		PassengerName:   req.Name,
@@ -72,6 +83,7 @@ func (l *LoginLogic) Login(req *types.PassengerLoginReq) (map[string]any, error)
 	}
 
 	conf := l.svcCtx.Config.AuthPassenger
+	secret := conf.GetAccessSecret("ONLINECAR_PASSENGER_JWT_SECRET")
 	claims := jwt.MapClaims{
 		"uid":     resp.Id,
 		"subject": "passenger",
@@ -79,7 +91,7 @@ func (l *LoginLogic) Login(req *types.PassengerLoginReq) (map[string]any, error)
 		"iat":     time.Now().Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenStr, err := token.SignedString([]byte(conf.AccessSecret))
+	tokenStr, err := token.SignedString([]byte(secret))
 	if err != nil {
 		l.Errorf("JWT签名失败, passengerId=%d, err=%v", resp.Id, err)
 		return nil, err

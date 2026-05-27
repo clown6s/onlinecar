@@ -19,34 +19,41 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 	server.Use(middleware.NewPanicRecoveryMiddleware().Handle)
 	server.Use(middleware.NewRequestIDMiddleware().Handle)
 	server.Use(middleware.NewAccessLogMiddleware().Handle)
-	server.Use(middleware.NewCORSMiddleware().Handle)
+	server.Use(middleware.NewCORSMiddleware(svcCtx.Config.CORS.AllowOrigins...).Handle)
+	server.Use(middleware.NewSecurityHeadersMiddleware().Handle)
 
-	// 健康检查（无需认证）
+	// 健康检查（无需认证、无限流）
 	server.AddRoutes([]rest.Route{
 		{Method: http.MethodGet, Path: "/healthz", Handler: healthhandler.HealthHandler(svcCtx)},
 	})
 
-	// 公开路由：不需要 JWT
-	server.AddRoutes([]rest.Route{
+	// 公开路由：不需要 JWT，带限流（20 req/s per IP）
+	publicRateLimit := middleware.NewRateLimitMiddleware(20).Handle
+	publicRoutes := []rest.Route{
 		{Method: http.MethodPost, Path: "/api/v1/driver/register", Handler: driverhandler.RegisterHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/driver/login", Handler: driverhandler.LoginHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/driver/sms/send", Handler: smshandler.DriverSendSmsHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/passenger/register", Handler: passengerhandler.RegisterHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/passenger/login", Handler: passengerhandler.LoginHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/passenger/sms/send", Handler: smshandler.PassengerSendSmsHandler(svcCtx)},
-	})
+	}
+	// 限制请求体大小 1MB
+	for i := range publicRoutes {
+		publicRoutes[i].Handler = publicRateLimit(publicRoutes[i].Handler)
+	}
+	server.AddRoutes(publicRoutes, rest.WithMaxBytes(1<<20))
 
-	// 司机认证路由（带限流）
-	driverAuth := middleware.NewJWTAuthMiddleware(svcCtx.Config.AuthDriver.AccessSecret)
+	// 司机认证路由（带限流 100 req/s per IP）
+	driverAuth := middleware.NewJWTAuthMiddleware(svcCtx.Config.AuthDriver.GetAccessSecret("ONLINECAR_DRIVER_JWT_SECRET"))
 	driverRateLimit := middleware.NewRateLimitMiddleware(100).Handle
 	server.AddRoutes([]rest.Route{
 		{Method: http.MethodPost, Path: "/api/v1/driver/location", Handler: driverRateLimit(driverAuth.Handle(driverhandler.UpdateLocationHandler(svcCtx)))},
-	})
+	}, rest.WithMaxBytes(1<<20))
 
-	// 乘客认证路由（带限流）
-	passengerAuth := middleware.NewJWTAuthMiddleware(svcCtx.Config.AuthPassenger.AccessSecret)
+	// 乘客认证路由（带限流 50 req/s per IP）
+	passengerAuth := middleware.NewJWTAuthMiddleware(svcCtx.Config.AuthPassenger.GetAccessSecret("ONLINECAR_PASSENGER_JWT_SECRET"))
 	passengerRateLimit := middleware.NewRateLimitMiddleware(50).Handle
 	server.AddRoutes([]rest.Route{
 		{Method: http.MethodPost, Path: "/api/v1/trip", Handler: passengerRateLimit(passengerAuth.Handle(triphandler.CreateTripHandler(svcCtx)))},
-	})
+	}, rest.WithMaxBytes(1<<20))
 }

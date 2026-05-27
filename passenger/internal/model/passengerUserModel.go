@@ -20,8 +20,10 @@ var (
 type (
 	PassengerUserModel interface {
 		Insert(ctx context.Context, data *PassengerUser) (sql.Result, error)
+		InsertWithConn(ctx context.Context, session sqlx.Session, data *PassengerUser) (sql.Result, error)
 		FindOne(ctx context.Context, id int64) (*PassengerUser, error)
 		FindByPhone(ctx context.Context, phone string) (*PassengerUser, error)
+		FindByPhoneWithConn(ctx context.Context, session sqlx.Session, phone string) (*PassengerUser, error)
 		Update(ctx context.Context, data *PassengerUser) error
 		Delete(ctx context.Context, id int64) error
 	}
@@ -110,4 +112,34 @@ func (m *defaultPassengerUserModel) Delete(ctx context.Context, id int64) error 
 	query := fmt.Sprintf("DELETE FROM %s WHERE `id` = ?", m.table)
 	_, err := m.conn.ExecCtx(ctx, query, id)
 	return err
+}
+
+// InsertWithConn 使用指定 session 执行插入（事务内使用）
+func (m *defaultPassengerUserModel) InsertWithConn(ctx context.Context, session sqlx.Session, data *PassengerUser) (sql.Result, error) {
+	now := time.Now()
+	data.GmtCreate = &now
+	data.GmtModified = &now
+
+	query := fmt.Sprintf(
+		"INSERT INTO %s (`passenger_phone`,`passenger_name`,`passenger_gender`,`state`,`profile_photo`) VALUES (?,?,?,?,?)",
+		m.table,
+	)
+	ret, err := session.ExecCtx(ctx, query,
+		data.PassengerPhone, data.PassengerName, data.PassengerGender, data.State, data.ProfilePhoto,
+	)
+	return ret, err
+}
+
+// FindByPhoneWithConn 使用指定 session 查询（事务内使用）
+func (m *defaultPassengerUserModel) FindByPhoneWithConn(ctx context.Context, session sqlx.Session, phone string) (*PassengerUser, error) {
+	query := fmt.Sprintf("SELECT %s FROM %s WHERE `passenger_phone` = ? LIMIT 1", strings.Join(passengerUserFieldNames, ","), m.table)
+	var resp PassengerUser
+	err := session.QueryRowCtx(ctx, &resp, query, phone)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &resp, nil
 }

@@ -6,62 +6,74 @@ info (
 	version: "1.0"
 )
 
-// ========== Driver 相关 ==========
+// ========== 司机 ==========
 type (
-	// 司机注册请求
 	DriverRegisterReq {
-		Name     string `json:"name"`
-		Phone    string `json:"phone"`
-		CarNo    string `json:"carNo"`
-		CarType  string `json:"carType"`
-		Password string `json:"password"`
+		Name           string `json:"name"`
+		Phone          string `json:"phone"`
+		VehicleNo      string `json:"vehicleNo"`
+		VehicleType    string `json:"vehicleType"`
+		CommercialType int64  `json:"commercialType,optional"`
 	}
-	// 司机登录请求
 	DriverLoginReq {
-		Phone    string `json:"phone"`
-		Password string `json:"password"`
+		Phone string `json:"phone"`
+		Code  string `json:"code"`
 	}
-	// 司机位置上报
 	DriverLocationReq {
 		Lng float64 `json:"lng"`
 		Lat float64 `json:"lat"`
 	}
-	// 司机响应
 	DriverResp {
-		Id       int64  `json:"id"`
-		Name     string `json:"name"`
-		Phone    string `json:"phone"`
-		CarNo    string `json:"carNo"`
-		CarType  string `json:"carType"`
-		Status   int64  `json:"status"`
+		Id             int64  `json:"id"`
+		Name           string `json:"name"`
+		Phone          string `json:"phone"`
+		VehicleNo      string `json:"vehicleNo"`
+		VehicleType    string `json:"vehicleType"`
+		Brand          string `json:"brand"`
+		Model          string `json:"model"`
+		CommercialType int64  `json:"commercialType"`
+		State          int64  `json:"state"`
+		WorkStatus     int64  `json:"workStatus"`
+	}
+	DriverWorkStatusReq {
+		WorkStatus int64 `json:"workStatus"`
+	}
+	DriverWorkStatusResp {
+		DriverId   int64 `json:"driverId"`
+		WorkStatus int64 `json:"workStatus"`
 	}
 )
 
-// ========== Passenger 相关 ==========
+// ========== 乘客 ==========
 type (
-	// 乘客注册请求
 	PassengerRegisterReq {
-		Name     string `json:"name"`
-		Phone    string `json:"phone"`
-		Password string `json:"password"`
-	}
-	// 乘客登录请求
-	PassengerLoginReq {
-		Phone    string `json:"phone"`
-		Password string `json:"password"`
-	}
-	// 乘客响应
-	PassengerResp {
-		Id     int64  `json:"id"`
 		Name   string `json:"name"`
 		Phone  string `json:"phone"`
-		Status int64  `json:"status"`
+		Gender int64  `json:"gender,optional"`
+	}
+	PassengerLoginReq {
+		Phone string `json:"phone"`
+		Code  string `json:"code"`
+	}
+	PassengerResp {
+		Id           int64  `json:"id"`
+		Name         string `json:"name"`
+		Phone        string `json:"phone"`
+		Gender       int64  `json:"gender"`
+		State        int64  `json:"state"`
+		ProfilePhoto string `json:"profilePhoto"`
 	}
 )
 
-// ========== Trip 相关 ==========
+// ========== 短信验证码 ==========
 type (
-	// 发起行程
+	SendSmsReq {
+		Phone string `json:"phone"`
+	}
+)
+
+// ========== 行程 ==========
+type (
 	CreateTripReq {
 		Origin      string  `json:"origin"`
 		Destination string  `json:"destination"`
@@ -70,7 +82,6 @@ type (
 		DestLng     float64 `json:"destLng"`
 		DestLat     float64 `json:"destLat"`
 	}
-	// 行程响应
 	TripResp {
 		Id          int64   `json:"id"`
 		PassengerId int64   `json:"passengerId"`
@@ -82,6 +93,8 @@ type (
 	}
 )
 
+// ========== 公开路由 ==========
+
 @server (
 	prefix: /api/v1
 	group:  driver
@@ -92,6 +105,9 @@ service gateway-api {
 
 	@handler DriverLogin
 	post /driver/login (DriverLoginReq)
+
+	@handler DriverSendSms
+	post /driver/sms/send (SendSmsReq)
 }
 
 @server (
@@ -104,7 +120,12 @@ service gateway-api {
 
 	@handler PassengerLogin
 	post /passenger/login (PassengerLoginReq)
+
+	@handler PassengerSendSms
+	post /passenger/sms/send (SendSmsReq)
 }
+
+// ========== 司机认证路由 ==========
 
 @server (
 	prefix: /api/v1
@@ -115,6 +136,8 @@ service gateway-api {
 	@handler UpdateDriverLocation
 	post /driver/location (DriverLocationReq)
 }
+
+// ========== 乘客认证路由 ==========
 
 @server (
 	prefix: /api/v1

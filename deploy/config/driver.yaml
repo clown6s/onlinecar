@@ -9,6 +9,8 @@ Etcd:
     - etcd-2:2379
     - etcd-3:2379
   Key: driver.rpc
+  User: onlinecar
+  Pass: "OnlineCar@2026#EtcdApp"
 
 # MySQL
 DataSource: "root:OnlineCar@2026#Prod@tcp(mysql:3306)/onlinecar_driver?charset=utf8mb4&parseTime=true&loc=Local"

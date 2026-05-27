@@ -38,7 +38,7 @@ func (l *LoginLogic) Login(in *pb.LoginReq) (*pb.LoginResp, error) {
 		return nil, fmt.Errorf("该手机号未注册")
 	}
 
-	// TODO: 密码验证（当前数据库无 password 字段，后续加列后接入）
+	// 验证码在 Gateway 层已校验，此处仅查询用户
 
 	var state int64
 	if driverUser.State != nil {

@@ -5,11 +5,13 @@ import (
 	"testing"
 	"time"
 
+	"onlinecar-gateway/common/sms"
 	"onlinecar-gateway/internal/config"
 	"onlinecar-gateway/internal/svc"
 	"onlinecar-gateway/internal/types"
 	passengerpb "onlinecar-gateway/pb/passenger"
 
+	"github.com/zeromicro/go-zero/core/stores/redis"
 	"google.golang.org/grpc"
 )
 
@@ -40,6 +42,10 @@ func (m *mockPassengerClient) CreateTrip(ctx context.Context, in *passengerpb.Cr
 	return nil, nil
 }
 
+func (m *mockPassengerClient) CheckPhone(ctx context.Context, in *passengerpb.CheckPhoneReq, opts ...grpc.CallOption) (*passengerpb.CheckPhoneResp, error) {
+	return &passengerpb.CheckPhoneResp{Exists: true}, nil
+}
+
 func newTestSvcCtx(client passengerpb.PassengerClient) *svc.ServiceContext {
 	return &svc.ServiceContext{
 		Config: config.Config{
@@ -49,6 +55,8 @@ func newTestSvcCtx(client passengerpb.PassengerClient) *svc.ServiceContext {
 			},
 		},
 		PassengerRpc: client,
+		Redis:        redis.Nil,
+		SmsSender:    sms.NewMockSmsSender(),
 	}
 }
 
@@ -78,14 +86,13 @@ func TestRegisterLogic_Success(t *testing.T) {
 
 func TestLoginLogic_Success(t *testing.T) {
 	ctx := context.Background()
-	mockClient := &mockPassengerClient{
-		loginFunc: func(ctx context.Context, in *passengerpb.LoginReq, opts ...grpc.CallOption) (*passengerpb.LoginResp, error) {
-			return &passengerpb.LoginResp{Id: 1, PassengerName: "李四", State: 0}, nil
-		},
-	}
 
-	logic := NewLoginLogic(ctx, newTestSvcCtx(mockClient))
-	resp, err := logic.Login(&types.PassengerLoginReq{Phone: "13900000001"})
+	svcCtx := newTestSvcCtx(&mockPassengerClient{})
+	codeKey := "sms:code:passenger:13900000001"
+	svcCtx.Redis.Setex(codeKey, "123456", 300)
+
+	logic := NewLoginLogic(ctx, svcCtx)
+	resp, err := logic.Login(&types.PassengerLoginReq{Phone: "13900000001", Code: "123456"})
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -94,5 +101,18 @@ func TestLoginLogic_Success(t *testing.T) {
 	}
 	if resp["token"] == nil || resp["token"].(string) == "" {
 		t.Error("expected non-empty token")
+	}
+}
+
+func TestLoginLogic_WrongCode(t *testing.T) {
+	ctx := context.Background()
+	svcCtx := newTestSvcCtx(&mockPassengerClient{})
+	codeKey := "sms:code:passenger:13900000001"
+	svcCtx.Redis.Setex(codeKey, "123456", 300)
+
+	logic := NewLoginLogic(ctx, svcCtx)
+	_, err := logic.Login(&types.PassengerLoginReq{Phone: "13900000001", Code: "654321"})
+	if err == nil {
+		t.Fatal("expected error for wrong code, got nil")
 	}
 }

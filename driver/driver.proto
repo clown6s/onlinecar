@@ -28,10 +28,9 @@ message Empty {}
 message RegisterReq {
   string driver_name  = 1; // 司机姓名
   string driver_phone = 2; // 手机号
-  string password     = 3; // 密码
-  string vehicle_no   = 4; // 车牌号
-  string vehicle_type = 5; // 车辆类型
-  int64  commercial_type = 6; // 服务类型：1网约车 2巡游 3合乘
+  string vehicle_no   = 3; // 车牌号
+  string vehicle_type = 4; // 车辆类型
+  int64  commercial_type = 5; // 服务类型：1网约车 2巡游 3合乘
 }
 
 // 注册响应
@@ -42,10 +41,9 @@ message RegisterResp {
   int64  state           = 4; // 0有效 1失效
 }
 
-// 登录请求
+// 登录请求（手机号直接登录，验证码在 Gateway 层校验）
 message LoginReq {
   string driver_phone = 1;
-  string password     = 2;
 }
 
 // 登录响应

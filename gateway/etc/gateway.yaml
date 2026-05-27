@@ -32,6 +32,11 @@ RedisConf:
   Type: node
   Pass: "admin@zzp"
 
+# CORS
+CORS:
+  AllowOrigins:
+    - "*"  # 生产环境替换为具体域名，如 ["https://app.onlinecar.com"]
+
 # 日志
 Log:
   ServiceName: gateway-api

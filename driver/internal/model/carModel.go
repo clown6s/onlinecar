@@ -26,6 +26,7 @@ var (
 type (
 	CarModel interface {
 		Insert(ctx context.Context, data *Car) (sql.Result, error)
+		InsertWithConn(ctx context.Context, session sqlx.Session, data *Car) (sql.Result, error)
 		FindOne(ctx context.Context, id int64) (*Car, error)
 		FindByVehicleNo(ctx context.Context, vehicleNo string) (*Car, error)
 		Update(ctx context.Context, data *Car) error
@@ -155,4 +156,26 @@ func (m *defaultCarModel) Delete(ctx context.Context, id int64) error {
 	query := fmt.Sprintf("DELETE FROM %s WHERE `id` = ?", m.table)
 	_, err := m.conn.ExecCtx(ctx, query, id)
 	return err
+}
+
+// InsertWithConn 使用指定连接执行插入（事务内使用）
+func (m *defaultCarModel) InsertWithConn(ctx context.Context, session sqlx.Session, data *Car) (sql.Result, error) {
+	now := time.Now()
+	data.GmtCreate = &now
+	data.GmtModified = &now
+
+	query := fmt.Sprintf(
+		"INSERT INTO %s (`address`,`vehicle_no`,`plate_color`,`seats`,`brand`,`model`,`vehicle_type`,`owner_name`,`vehicle_color`,`engine_id`,`vin`,`certify_date_a`,`fue_type`,`engine_displace`,`trans_agency`,`trans_area`,`trans_date_start`,`trans_date_end`,`certify_date_b`,`fix_state`,`next_fix_date`,`check_state`,`fee_print_id`,`gps_brand`,`gps_model`,`gps_install_date`,`register_date`,`commercial_type`,`fare_type`,`state`,`tid`,`trid`,`trname`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+		m.table,
+	)
+	ret, err := session.ExecCtx(ctx, query,
+		data.Address, data.VehicleNo, data.PlateColor, data.Seats, data.Brand,
+		data.Model, data.VehicleType, data.OwnerName, data.VehicleColor, data.EngineId,
+		data.Vin, data.CertifyDateA, data.FueType, data.EngineDisplace, data.TransAgency,
+		data.TransArea, data.TransDateStart, data.TransDateEnd, data.CertifyDateB, data.FixState,
+		data.NextFixDate, data.CheckState, data.FeePrintId, data.GpsBrand, data.GpsModel,
+		data.GpsInstallDate, data.RegisterDate, data.CommercialType, data.FareType, data.State,
+		data.Tid, data.Trid, data.Trname,
+	)
+	return ret, err
 }

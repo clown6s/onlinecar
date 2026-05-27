@@ -19,6 +19,7 @@ var (
 type (
 	DriverCarBindingModel interface {
 		Insert(ctx context.Context, data *DriverCarBinding) (sql.Result, error)
+		InsertWithConn(ctx context.Context, session sqlx.Session, data *DriverCarBinding) (sql.Result, error)
 		FindByDriverId(ctx context.Context, driverId int64) (*DriverCarBinding, error)
 		Update(ctx context.Context, data *DriverCarBinding) error
 	}
@@ -59,7 +60,10 @@ func (m *defaultDriverCarBindingModel) FindByDriverId(ctx context.Context, drive
 	var resp DriverCarBinding
 	err := m.conn.QueryRowCtx(ctx, &resp, query, driverId)
 	if err != nil {
-		return nil, nil
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
 	}
 	return &resp, nil
 }
@@ -71,4 +75,14 @@ func (m *defaultDriverCarBindingModel) Update(ctx context.Context, data *DriverC
 	)
 	_, err := m.conn.ExecCtx(ctx, query, data.BindState, data.BindingTime, data.UnBindingTime, data.Id)
 	return err
+}
+
+// InsertWithConn 使用指定 session 执行插入（事务内使用）
+func (m *defaultDriverCarBindingModel) InsertWithConn(ctx context.Context, session sqlx.Session, data *DriverCarBinding) (sql.Result, error) {
+	query := fmt.Sprintf(
+		"INSERT INTO %s (`driver_id`,`car_id`,`bind_state`,`binding_time`) VALUES (?,?,?,?)",
+		m.table,
+	)
+	ret, err := session.ExecCtx(ctx, query, data.DriverId, data.CarId, data.BindState, data.BindingTime)
+	return ret, err
 }

@@ -27,13 +27,14 @@ func (m *CORSMiddleware) Handle(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		if allowed {
-			if o := m.resolveOrigin(origin); o != "" {
-				w.Header().Set("Access-Control-Allow-Origin", o)
+			resolvedOrigin := m.resolveOrigin(origin)
+			if resolvedOrigin != "" {
+				w.Header().Set("Access-Control-Allow-Origin", resolvedOrigin)
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID")
+				w.Header().Set("Access-Control-Allow-Credentials", "true")
+				w.Header().Set("Access-Control-Max-Age", "86400")
 			}
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID")
-			w.Header().Set("Access-Control-Allow-Credentials", "true")
-			w.Header().Set("Access-Control-Max-Age", "86400")
 		}
 
 		if r.Method == http.MethodOptions {
@@ -48,7 +49,8 @@ func (m *CORSMiddleware) Handle(next http.HandlerFunc) http.HandlerFunc {
 func (m *CORSMiddleware) resolveOrigin(origin string) string {
 	for _, o := range m.allowOrigins {
 		if o == "*" {
-			return "*"
+			// Credentials=true 时不能返回 *，回显请求的 Origin
+			return origin
 		}
 		if o == origin {
 			return origin
