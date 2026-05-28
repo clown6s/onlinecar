@@ -49,10 +49,9 @@ RedisConf:
   Type: node
   Pass: "admin@zzp"
 
-# CORS
+# CORS — 生产环境填写具体域名，开发环境按需添加 localhost
 CORS:
-  AllowOrigins:
-    - "*"  # 生产环境替换为具体域名，如 ["https://app.onlinecar.com"]
+  AllowOrigins: []  # 空 = 拒绝所有跨域，需要时填 ["http://localhost:5173"]
 
 # 日志
 Log:

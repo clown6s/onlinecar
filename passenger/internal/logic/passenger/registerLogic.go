@@ -2,6 +2,7 @@ package passengerlogic
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"unicode/utf8"
 
@@ -78,7 +79,8 @@ func (l *RegisterLogic) Register(in *pb.RegisterReq) (*pb.RegisterResp, error) {
 		return nil
 	})
 	if err != nil {
-		if codeErr, ok := err.(*errorx.CodeError); ok {
+		var codeErr *errorx.CodeError
+		if errors.As(err, &codeErr) {
 			return nil, codeErr
 		}
 		logx.Errorf("乘客注册事务失败, phone=%s, err=%v", in.PassengerPhone, err)

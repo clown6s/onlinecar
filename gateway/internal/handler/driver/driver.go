@@ -7,8 +7,8 @@ import (
 	"unicode/utf8"
 
 	"onlinecar-common/errorx"
+	"onlinecar-common/validate"
 	"onlinecar-gateway/common/response"
-	"onlinecar-gateway/common/validate"
 	driverlogic "onlinecar-gateway/internal/logic/driver"
 	"onlinecar-gateway/internal/svc"
 	"onlinecar-gateway/internal/types"

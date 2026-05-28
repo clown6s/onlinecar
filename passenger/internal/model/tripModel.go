@@ -28,6 +28,7 @@ type (
 		FindByPassengerIdAndStatus(ctx context.Context, passengerId int64, status int8, page, pageSize int) ([]*Trip, error)
 		FindActiveTrips(ctx context.Context, passengerId int64, statuses []int8) ([]*Trip, error)
 		Update(ctx context.Context, data *Trip) error
+		UpdateWithStatusCheck(ctx context.Context, data *Trip, expectedStatus int8) (bool, error)
 	}
 
 	defaultTripModel struct {
@@ -182,4 +183,25 @@ func (m *defaultTripModel) Update(ctx context.Context, data *Trip) error {
 		data.DriverId, data.Status, data.Fare, data.GmtModified, data.Id,
 	)
 	return err
+}
+
+// UpdateWithStatusCheck 带状态前置检查的更新（乐观锁）
+// 仅当当前数据库状态为 expectedStatus 时才执行更新，返回是否更新成功（rows affected > 0）。
+// 用于防止并发状态下竞态修改（如司机接单和乘客取消同时发生）。
+func (m *defaultTripModel) UpdateWithStatusCheck(ctx context.Context, data *Trip, expectedStatus int8) (bool, error) {
+	now := time.Now()
+	data.GmtModified = &now
+
+	query := fmt.Sprintf(
+		"UPDATE %s SET `driver_id`=?,`status`=?,`fare`=?,`gmt_modified`=? WHERE `id` = ? AND `status` = ?",
+		m.table,
+	)
+	ret, err := m.conn.ExecCtx(ctx, query,
+		data.DriverId, data.Status, data.Fare, data.GmtModified, data.Id, expectedStatus,
+	)
+	if err != nil {
+		return false, err
+	}
+	affected, _ := ret.RowsAffected()
+	return affected > 0, nil
 }

@@ -62,10 +62,9 @@ type RegisterReq struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	DriverName     string                 `protobuf:"bytes,1,opt,name=driver_name,json=driverName,proto3" json:"driver_name,omitempty"`              // 司机姓名
 	DriverPhone    string                 `protobuf:"bytes,2,opt,name=driver_phone,json=driverPhone,proto3" json:"driver_phone,omitempty"`           // 手机号
-	Password       string                 `protobuf:"bytes,3,opt,name=password,proto3" json:"password,omitempty"`                                    // 密码
-	VehicleNo      string                 `protobuf:"bytes,4,opt,name=vehicle_no,json=vehicleNo,proto3" json:"vehicle_no,omitempty"`                 // 车牌号
-	VehicleType    string                 `protobuf:"bytes,5,opt,name=vehicle_type,json=vehicleType,proto3" json:"vehicle_type,omitempty"`           // 车辆类型
-	CommercialType int64                  `protobuf:"varint,6,opt,name=commercial_type,json=commercialType,proto3" json:"commercial_type,omitempty"` // 服务类型：1网约车 2巡游 3合乘
+	VehicleNo      string                 `protobuf:"bytes,3,opt,name=vehicle_no,json=vehicleNo,proto3" json:"vehicle_no,omitempty"`                 // 车牌号
+	VehicleType    string                 `protobuf:"bytes,4,opt,name=vehicle_type,json=vehicleType,proto3" json:"vehicle_type,omitempty"`           // 车辆类型
+	CommercialType int64                  `protobuf:"varint,5,opt,name=commercial_type,json=commercialType,proto3" json:"commercial_type,omitempty"` // 服务类型：1网约车 2巡游 3合乘
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -110,13 +109,6 @@ func (x *RegisterReq) GetDriverName() string {
 func (x *RegisterReq) GetDriverPhone() string {
 	if x != nil {
 		return x.DriverPhone
-	}
-	return ""
-}
-
-func (x *RegisterReq) GetPassword() string {
-	if x != nil {
-		return x.Password
 	}
 	return ""
 }
@@ -211,11 +203,10 @@ func (x *RegisterResp) GetState() int64 {
 	return 0
 }
 
-// 登录请求
+// 登录请求（手机号直接登录，验证码在 Gateway 层校验）
 type LoginReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	DriverPhone   string                 `protobuf:"bytes,1,opt,name=driver_phone,json=driverPhone,proto3" json:"driver_phone,omitempty"`
-	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -253,13 +244,6 @@ func (*LoginReq) Descriptor() ([]byte, []int) {
 func (x *LoginReq) GetDriverPhone() string {
 	if x != nil {
 		return x.DriverPhone
-	}
-	return ""
-}
-
-func (x *LoginReq) GetPassword() string {
-	if x != nil {
-		return x.Password
 	}
 	return ""
 }
@@ -818,25 +802,23 @@ var File_driver_proto protoreflect.FileDescriptor
 const file_driver_proto_rawDesc = "" +
 	"\n" +
 	"\fdriver.proto\x12\x06driver\"\a\n" +
-	"\x05Empty\"\xd8\x01\n" +
+	"\x05Empty\"\xbc\x01\n" +
 	"\vRegisterReq\x12\x1f\n" +
 	"\vdriver_name\x18\x01 \x01(\tR\n" +
 	"driverName\x12!\n" +
-	"\fdriver_phone\x18\x02 \x01(\tR\vdriverPhone\x12\x1a\n" +
-	"\bpassword\x18\x03 \x01(\tR\bpassword\x12\x1d\n" +
+	"\fdriver_phone\x18\x02 \x01(\tR\vdriverPhone\x12\x1d\n" +
 	"\n" +
-	"vehicle_no\x18\x04 \x01(\tR\tvehicleNo\x12!\n" +
-	"\fvehicle_type\x18\x05 \x01(\tR\vvehicleType\x12'\n" +
-	"\x0fcommercial_type\x18\x06 \x01(\x03R\x0ecommercialType\"x\n" +
+	"vehicle_no\x18\x03 \x01(\tR\tvehicleNo\x12!\n" +
+	"\fvehicle_type\x18\x04 \x01(\tR\vvehicleType\x12'\n" +
+	"\x0fcommercial_type\x18\x05 \x01(\x03R\x0ecommercialType\"x\n" +
 	"\fRegisterResp\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1f\n" +
 	"\vdriver_name\x18\x02 \x01(\tR\n" +
 	"driverName\x12!\n" +
 	"\fdriver_phone\x18\x03 \x01(\tR\vdriverPhone\x12\x14\n" +
-	"\x05state\x18\x04 \x01(\x03R\x05state\"I\n" +
+	"\x05state\x18\x04 \x01(\x03R\x05state\"-\n" +
 	"\bLoginReq\x12!\n" +
-	"\fdriver_phone\x18\x01 \x01(\tR\vdriverPhone\x12\x1a\n" +
-	"\bpassword\x18\x02 \x01(\tR\bpassword\"R\n" +
+	"\fdriver_phone\x18\x01 \x01(\tR\vdriverPhone\"R\n" +
 	"\tLoginResp\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1f\n" +
 	"\vdriver_name\x18\x02 \x01(\tR\n" +

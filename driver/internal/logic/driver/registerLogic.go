@@ -2,6 +2,7 @@ package driverlogic
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 	"unicode/utf8"
@@ -123,8 +124,9 @@ func (l *RegisterLogic) Register(in *pb.RegisterReq) (*pb.RegisterResp, error) {
 		return nil
 	})
 	if err != nil {
-		// 已知的业务错误直接返回
-		if codeErr, ok := err.(*errorx.CodeError); ok {
+		// 已知的业务错误直接返回（支持 wrapped error 解包）
+		var codeErr *errorx.CodeError
+		if errors.As(err, &codeErr) {
 			return nil, codeErr
 		}
 		// 系统错误返回通用信息，记录详细日志

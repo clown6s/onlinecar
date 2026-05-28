@@ -34,6 +34,7 @@ func main() {
 
 	ctx := svc.NewServiceContext(c)
 	defer ctx.Close()
+	defer ctx.ProvinceCache.Stop()
 	defer middleware.StopRateLimiters()
 
 	ctx.ProvinceCache.Start(context.Background())

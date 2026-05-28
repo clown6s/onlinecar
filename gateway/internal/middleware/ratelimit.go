@@ -44,7 +44,7 @@ func NewRateLimitMiddleware(r int, trustedSubnets ...string) *RateLimitMiddlewar
 	if r <= 0 {
 		r = 1
 	}
-	burst := r
+	burst := r * 2 // 允许短时突发，避免正常快速操作被误限流
 	ctx, cancel := context.WithCancel(context.Background())
 	m := &RateLimitMiddleware{
 		rate:            r,
@@ -99,9 +99,17 @@ func (m *RateLimitMiddleware) getLimiter(ip string) *ipLimiter {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// 防止 DDoS 下 map 无限增长
+	// 防止 DDoS 下 map 无限增长：淘汰最旧条目（LRU），而非直接拒绝新 IP
 	if len(m.limiters) >= m.maxEntries {
-		return nil
+		var oldestIP string
+		var oldestTime time.Time
+		for ip, l := range m.limiters {
+			if oldestIP == "" || l.lastRef.Before(oldestTime) {
+				oldestIP = ip
+				oldestTime = l.lastRef
+			}
+		}
+		delete(m.limiters, oldestIP)
 	}
 
 	limiter, ok := m.limiters[ip]

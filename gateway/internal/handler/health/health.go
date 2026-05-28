@@ -57,6 +57,7 @@ func HealthHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		}
 
 		if status == "degraded" {
+			// 降级时仅返回状态和通用提示，不暴露后端服务拓扑
 			response.Error(w, http.StatusServiceUnavailable, 50301, "service degraded")
 		} else {
 			response.Success(w, HealthResponse{Status: status, Details: details})

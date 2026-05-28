@@ -19,6 +19,9 @@ type UpdateLocationLogic struct {
 }
 
 // updateLocationScript 原子写入司机位置 + 更新时间戳
+// 注意：此脚本不为 Redis key 设置 TTL，过期数据由 driver.go 中的后台 goroutine
+// 每小时扫描 driver:last_update 并清理超过 24h 的条目。这是有意设计：
+// 如果服务重启，goroutine 会自动恢复清理，无需担心数据无限增长。
 const updateLocationScript = `
 redis.call('GEOADD', KEYS[1], ARGV[1], ARGV[2], ARGV[3])
 redis.call('HSET', KEYS[2], ARGV[3], ARGV[4])

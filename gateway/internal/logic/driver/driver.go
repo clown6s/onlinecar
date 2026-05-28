@@ -116,7 +116,7 @@ func (l *LoginLogic) Login(req *types.DriverLoginReq) (*LoginResp, error) {
 	l.Infof("司机登录成功, driverId=%d, name=%s", resp.Id, resp.DriverName)
 	return &LoginResp{
 		Token:     tokenStr,
-		ExpiresIn: int64(conf.AccessExpire.Seconds()),
+		ExpiresIn: max(int64(conf.AccessExpire.Seconds()), 1),
 	}, nil
 }
 

@@ -14,11 +14,12 @@ import (
 // ProvinceCache 省级行政区本地内存缓存
 // 采用异步刷新：后台 goroutine 定期拉取，请求路径只做 RLock 读，零阻塞
 type ProvinceCache struct {
-	client districtpb.DistrictServiceClient
-	data   []*types.DistrictNodeResp
-	mu     sync.RWMutex
-	ttl    time.Duration
-	cancel context.CancelFunc
+	client    districtpb.DistrictServiceClient
+	data      []*types.DistrictNodeResp
+	mu        sync.RWMutex
+	ttl       time.Duration
+	startOnce sync.Once
+	cancel    context.CancelFunc
 }
 
 func NewProvinceCache(client districtpb.DistrictServiceClient, ttl time.Duration) *ProvinceCache {
@@ -44,26 +45,28 @@ func (c *ProvinceCache) Get(_ context.Context) ([]*types.DistrictNodeResp, error
 	return result, nil
 }
 
-// Start 启动后台异步刷新 goroutine
+// Start 启动后台异步刷新 goroutine（使用 sync.Once 保证只执行一次）
 func (c *ProvinceCache) Start(ctx context.Context) {
-	ctx, c.cancel = context.WithCancel(ctx)
+	c.startOnce.Do(func() {
+		ctx, c.cancel = context.WithCancel(ctx)
 
-	// 启动时同步加载，确保首次请求不空
-	c.load(ctx)
+		// 启动时同步加载，确保首次请求不空
+		c.load(ctx)
 
-	go func() {
-		ticker := time.NewTicker(c.ttl)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				c.load(ctx)
+		go func() {
+			ticker := time.NewTicker(c.ttl)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					c.load(ctx)
+				}
 			}
-		}
-	}()
-	logx.Infof("ProvinceCache 异步刷新已启动, ttl=%v", c.ttl)
+		}()
+		logx.Infof("ProvinceCache 异步刷新已启动, ttl=%v", c.ttl)
+	})
 }
 
 // Stop 停止后台刷新

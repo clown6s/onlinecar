@@ -1,35 +1,36 @@
 package middleware
 
 import (
+	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"onlinecar-common/ctxdata"
 	"onlinecar-common/errorx"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/zeromicro/go-zero/core/logx"
+	"github.com/zeromicro/go-zero/core/stores/redis"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
 type JWTAuthMiddleware struct {
 	Secret string
 	Role   string // "driver" 或 "passenger"，为空时不校验角色
+	Redis  *redis.Redis
 }
 
-func NewJWTAuthMiddleware(secret string, role ...string) *JWTAuthMiddleware {
+func NewJWTAuthMiddleware(secret string, r *redis.Redis, role string) *JWTAuthMiddleware {
 	if secret == "" {
 		logx.Must(fmt.Errorf("JWT secret must not be empty"))
 	}
-	m := &JWTAuthMiddleware{Secret: secret}
-	if len(role) > 0 {
-		m.Role = role[0]
-	}
-	return m
+	return &JWTAuthMiddleware{Secret: secret, Role: role, Redis: r}
 }
 
 func (m *JWTAuthMiddleware) Handle(next http.HandlerFunc) http.HandlerFunc {
@@ -83,6 +84,19 @@ func (m *JWTAuthMiddleware) Handle(next http.HandlerFunc) http.HandlerFunc {
 			}
 		}
 
+		// JWT 黑名单检查（支持主动失效 token，如用户禁用、强制下线等）
+		if m.Redis != nil {
+			tokenHash := fmt.Sprintf("%x", sha256.Sum256([]byte(parts[1])))
+			blacklistKey := "token:blacklist:" + tokenHash
+			val, err := m.Redis.Get(blacklistKey)
+			if err == nil && val != "" {
+				logx.Infof("认证失败: token已失效(黑名单), method=%s, path=%s, ip=%s",
+					r.Method, r.URL.Path, r.RemoteAddr)
+				httpx.Error(w, errorx.ErrTokenInvalid)
+				return
+			}
+		}
+
 		uidFloat, ok := claims["uid"].(float64)
 		if !ok {
 			// 兼容多种 uid 类型，防止大 ID 精度丢失
@@ -114,4 +128,39 @@ func (m *JWTAuthMiddleware) Handle(next http.HandlerFunc) http.HandlerFunc {
 		ctx := ctxdata.SetUID(r.Context(), uid)
 		next(w, r.WithContext(ctx))
 	}
+}
+
+// InvalidateToken 将 token 加入黑名单，使其立即失效。
+// TTL 自动设为 token 的剩余有效时间（从 JWT exp claim 计算）。
+// 调用方示例（用户禁用/强制下线时）：
+//
+//	middleware.InvalidateToken(redis, secret, tokenStr)
+func InvalidateToken(rdb *redis.Redis, secret, tokenStr string) error {
+	if rdb == nil || tokenStr == "" {
+		return nil
+	}
+	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
+		if t.Method != jwt.SigningMethodHS256 {
+			return nil, errors.New("unexpected signing method")
+		}
+		return []byte(secret), nil
+	})
+	if err != nil || !token.Valid {
+		return fmt.Errorf("invalid token: %w", err)
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return errors.New("invalid claims")
+	}
+	expFloat, ok := claims["exp"].(float64)
+	if !ok {
+		return errors.New("token missing exp claim")
+	}
+	remaining := time.Until(time.Unix(int64(expFloat), 0))
+	if remaining <= 0 {
+		return nil // token 已过期，无需加入黑名单
+	}
+	tokenHash := fmt.Sprintf("%x", sha256.Sum256([]byte(tokenStr)))
+	blacklistKey := "token:blacklist:" + tokenHash
+	return rdb.SetexCtx(context.Background(), blacklistKey, "1", int(remaining.Seconds()))
 }

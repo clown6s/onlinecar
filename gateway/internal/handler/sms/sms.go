@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"onlinecar-common/errorx"
+	"onlinecar-common/validate"
 	"onlinecar-gateway/common/response"
-	"onlinecar-gateway/common/validate"
 	smslogic "onlinecar-gateway/internal/logic/sms"
 	"onlinecar-gateway/internal/svc"
 	"onlinecar-gateway/internal/types"

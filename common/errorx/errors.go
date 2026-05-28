@@ -2,6 +2,7 @@ package errorx
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -30,9 +31,7 @@ func (e *CodeError) Error() string {
 // HttpCode 返回对应的 HTTP 状态码
 func (e *CodeError) HttpCode() int {
 	switch {
-	// HTTP 标准状态码映射
-	case e.Code == 400:
-		return http.StatusBadRequest
+	// HTTP 标准状态码映射（仅限语义与 HTTP 一致的错误码）
 	case e.Code == 401:
 		return http.StatusUnauthorized
 	case e.Code == 403:
@@ -71,9 +70,10 @@ var (
 )
 
 // ========== 业务错误码 ==========
+// ErrCodeParam 参数错误（使用 10xxx 范围，避免与 HTTP 401/403/404 等标准状态码冲突）
+// 注意：ErrAuth(401)、ErrForbidden(403)、ErrNotFound(404) 保留 HTTP 标准码，因其语义与 HTTP 一致
 const (
-	// 通用
-	ErrCodeParam = 400
+	ErrCodeParam = 10011
 
 	// 用户相关 10001-10099
 	ErrCodePhoneRegistered    = 10001
@@ -85,6 +85,7 @@ const (
 	ErrCodeSmsSendFrequent    = 10007 // 原编号10008，顺延调整
 	ErrCodePhoneFormat        = 10008 // 原编号10009，顺延调整
 	ErrCodeSmsTooManyAttempts = 10009 // 验证码错误次数过多
+	ErrCodeLoginFailed        = 10010 // 登录失败（手机号或验证码错误）
 
 	// 车辆相关 20001-20099
 	ErrCodeVehicleNotFound = 20001
@@ -121,6 +122,7 @@ var (
 	ErrSmsSendFrequent    = NewCodeError(ErrCodeSmsSendFrequent, "发送过于频繁，请60秒后重试")
 	ErrPhoneFormat        = NewCodeError(ErrCodePhoneFormat, "手机号格式不正确")
 	ErrSmsTooManyAttempts = NewCodeError(ErrCodeSmsTooManyAttempts, "验证码错误次数过多，请稍后再试")
+	ErrLoginFailed        = NewCodeError(ErrCodeLoginFailed, "手机号或验证码错误")
 
 	// 车辆
 	ErrVehicleNotFound = NewCodeError(ErrCodeVehicleNotFound, "车辆不存在")
@@ -153,41 +155,48 @@ func SetGrpcBizCode(ctx context.Context, bizCode int) {
 	_ = grpc.SetTrailer(ctx, metadata.Pairs("x-biz-code", strconv.Itoa(bizCode)))
 }
 
+// errorMsgToBizCode 错误消息 → 业务错误码映射（单一数据源，供 ErrorToBizCode 和 MapRpcError 共用）
+// 新增错误类型时只需在此处添加一行，避免两处 switch 重复维护
+var errorMsgToBizCode = []struct {
+	substr  string
+	bizCode int
+}{
+	{"该手机号已注册", ErrCodePhoneRegistered},
+	{"车辆不存在", ErrCodeVehicleNotFound},
+	{"司机不存在", ErrCodeUserNotFound},
+	{"用户不存在", ErrCodeUserNotFound},
+	{"已禁用", ErrCodeUserDisabled},
+	{"乘客账号已禁用", ErrCodeUserDisabled},
+	{"验证码错误", ErrCodeSmsCodeError},
+	{"验证码已过期", ErrCodeSmsCodeExpired},
+	{"发送过于频繁", ErrCodeSmsSendFrequent},
+	{"创建行程失败", ErrCodeTripCreateFailed},
+	{"行政区划不存在", ErrCodeDistrictNotFound},
+	{"验证码错误次数过多", ErrCodeSmsTooManyAttempts},
+	{"车辆已绑定", ErrCodeVehicleBound},
+	{"手机号或验证码错误", ErrCodeLoginFailed},
+	{"无效的", ErrCodeParam},
+	{"不能为空", ErrCodeParam},
+	{"坐标无效", ErrCodeParam},
+}
+
+// matchErrorBizCode 根据错误消息匹配业务错误码，返回 0 表示未匹配
+func matchErrorBizCode(msg string) int {
+	for _, m := range errorMsgToBizCode {
+		if strings.Contains(msg, m.substr) {
+			return m.bizCode
+		}
+	}
+	return 0
+}
+
 // ErrorToBizCode 根据错误消息匹配业务错误码，供 RPC 服务端 UnaryInterceptor 使用。
 // 返回 0 表示未匹配到已知业务错误码。
 func ErrorToBizCode(err error) int {
 	if err == nil {
 		return 0
 	}
-	msg := err.Error()
-	switch {
-	case strings.Contains(msg, "该手机号已注册"):
-		return ErrCodePhoneRegistered
-	case strings.Contains(msg, "车辆不存在"):
-		return ErrCodeVehicleNotFound
-	case strings.Contains(msg, "司机不存在") || strings.Contains(msg, "用户不存在"):
-		return ErrCodeUserNotFound
-	case strings.Contains(msg, "已禁用") || strings.Contains(msg, "乘客账号已禁用"):
-		return ErrCodeUserDisabled
-	case strings.Contains(msg, "验证码错误"):
-		return ErrCodeSmsCodeError
-	case strings.Contains(msg, "验证码已过期"):
-		return ErrCodeSmsCodeExpired
-	case strings.Contains(msg, "发送过于频繁"):
-		return ErrCodeSmsSendFrequent
-	case strings.Contains(msg, "创建行程失败"):
-		return ErrCodeTripCreateFailed
-	case strings.Contains(msg, "行政区划不存在"):
-		return ErrCodeDistrictNotFound
-	case strings.Contains(msg, "验证码错误次数过多"):
-		return ErrCodeSmsTooManyAttempts
-	case strings.Contains(msg, "车辆已绑定"):
-		return ErrCodeVehicleBound
-	case strings.Contains(msg, "无效的") || strings.Contains(msg, "不能为空") || strings.Contains(msg, "坐标无效"):
-		return ErrCodeParam
-	default:
-		return 0
-	}
+	return matchErrorBizCode(err.Error())
 }
 
 // BizCodeToError 根据业务错误码返回对应的 CodeError，供网关侧 MapRpcError 使用。
@@ -214,6 +223,8 @@ func BizCodeToError(bizCode int) *CodeError {
 		return ErrPhoneFormat
 	case ErrCodeSmsTooManyAttempts:
 		return ErrSmsTooManyAttempts
+	case ErrCodeLoginFailed:
+		return ErrLoginFailed
 	case ErrCodeVehicleNotFound:
 		return ErrVehicleNotFound
 	case ErrCodeVehicleBound:
@@ -303,40 +314,17 @@ func MapRpcError(err error) *CodeError {
 		}
 	}
 
-	// fallback: 字符串匹配
-	msg := err.Error()
+	// errors.As 解包：优先匹配被包装的 *CodeError（如 TransactCtx 包装后的错误）
+	var codeErr *CodeError
+	if errors.As(err, &codeErr) {
+		return codeErr
+	}
 
-	switch {
-	case strings.Contains(msg, "该手机号已注册"):
-		return ErrPhoneRegistered
-	case strings.Contains(msg, "车辆不存在"):
-		return ErrVehicleNotFound
-	case strings.Contains(msg, "司机不存在") || strings.Contains(msg, "用户不存在"):
-		return ErrUserNotFound
-	case strings.Contains(msg, "验证码错误"):
-		return ErrSmsCodeError
-	case strings.Contains(msg, "验证码已过期"):
-		return ErrSmsCodeExpired
-	case strings.Contains(msg, "发送过于频繁"):
-		return ErrSmsSendFrequent
-	case strings.Contains(msg, "已禁用"):
-		return ErrUserDisabled
-	case strings.Contains(msg, "无效的"):
-		return ErrParam
-	case strings.Contains(msg, "不能为空"):
-		return ErrParam
-	case strings.Contains(msg, "创建行程失败"):
-		return ErrTripCreateFailed
-	case strings.Contains(msg, "坐标无效"):
-		return ErrParam
-	case strings.Contains(msg, "乘客账号已禁用"):
-		return ErrUserDisabled
-	case strings.Contains(msg, "行政区划不存在"):
-		return ErrDistrictNotFound
-	case strings.Contains(msg, "验证码错误次数过多"):
-		return ErrSmsTooManyAttempts
-	case strings.Contains(msg, "车辆已绑定"):
-		return ErrVehicleBound
+	// fallback: 字符串匹配，复用 matchErrorBizCode + BizCodeToError 避免重复维护
+	if bizCode := matchErrorBizCode(err.Error()); bizCode != 0 {
+		if ce := BizCodeToError(bizCode); ce != nil {
+			return ce
+		}
 	}
 
 	return ErrServer

@@ -40,9 +40,10 @@ func (l *LoginLogic) Login(in *pb.LoginReq) (*pb.LoginResp, error) {
 	if err != nil {
 		if errors.Is(err, model.ErrNotFound) {
 			// 统一返回模糊信息，避免暴露注册状态（与 driver 对齐）
-			return nil, errorx.NewCodeError(errorx.ErrAuth.Code, "手机号或验证码错误")
+			return nil, errorx.ErrLoginFailed
 		}
-		if codeErr, ok := err.(*errorx.CodeError); ok {
+		var codeErr *errorx.CodeError
+		if errors.As(err, &codeErr) {
 			return nil, codeErr
 		}
 		l.Errorf("查询乘客失败, phone=%s, err=%v", in.PassengerPhone, err)

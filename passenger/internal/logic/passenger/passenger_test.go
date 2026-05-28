@@ -94,8 +94,16 @@ func (m *mockTripModel) FindByPassengerIdAndStatus(ctx context.Context, passenge
 	return nil, nil
 }
 
+func (m *mockTripModel) FindActiveTrips(ctx context.Context, passengerId int64, statuses []int8) ([]*model.Trip, error) {
+	return nil, nil
+}
+
 func (m *mockTripModel) Update(ctx context.Context, data *model.Trip) error {
 	return nil
+}
+
+func (m *mockTripModel) UpdateWithStatusCheck(ctx context.Context, data *model.Trip, expectedStatus int8) (bool, error) {
+	return true, nil
 }
 
 type mockResult struct{ lastInsertID, rowsAffected int64 }

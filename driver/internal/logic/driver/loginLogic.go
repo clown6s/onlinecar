@@ -44,7 +44,7 @@ func (l *LoginLogic) Login(in *pb.LoginReq) (*pb.LoginResp, error) {
 			l.Errorf("查询司机失败, phone=%s, err=%v", in.DriverPhone, err)
 		}
 		// 统一返回模糊信息，避免暴露注册状态
-		return nil, errorx.NewCodeError(errorx.ErrAuth.Code, "手机号或验证码错误")
+		return nil, errorx.ErrLoginFailed
 	}
 
 	// 验证码在 Gateway 层已校验，此处仅查询用户

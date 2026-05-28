@@ -9,6 +9,8 @@ import (
 	"onlinecar-driver/internal/model"
 	"onlinecar-driver/internal/svc"
 	"onlinecar-driver/pb"
+
+	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
 // ========== Mock Models ==========
@@ -16,6 +18,9 @@ import (
 type mockDriverCarBindingModel struct{}
 
 func (m *mockDriverCarBindingModel) Insert(ctx context.Context, data *model.DriverCarBinding) (sql.Result, error) {
+	return nil, nil
+}
+func (m *mockDriverCarBindingModel) InsertWithConn(ctx context.Context, session sqlx.Session, data *model.DriverCarBinding) (sql.Result, error) {
 	return nil, nil
 }
 func (m *mockDriverCarBindingModel) FindByDriverId(ctx context.Context, driverId int64) (*model.DriverCarBinding, error) {
@@ -30,8 +35,14 @@ type mockCarModel struct{}
 func (m *mockCarModel) Insert(ctx context.Context, data *model.Car) (sql.Result, error) {
 	return nil, nil
 }
+func (m *mockCarModel) InsertWithConn(ctx context.Context, session sqlx.Session, data *model.Car) (sql.Result, error) {
+	return nil, nil
+}
 func (m *mockCarModel) FindOne(ctx context.Context, id int64) (*model.Car, error) { return nil, nil }
 func (m *mockCarModel) FindByVehicleNo(ctx context.Context, vehicleNo string) (*model.Car, error) {
+	return nil, nil
+}
+func (m *mockCarModel) FindByVehicleNoWithConn(ctx context.Context, session sqlx.Session, vehicleNo string) (*model.Car, error) {
 	return nil, nil
 }
 func (m *mockCarModel) Update(ctx context.Context, data *model.Car) error { return nil }
@@ -71,6 +82,18 @@ func (m *mockDriverUserModel) Insert(ctx context.Context, data *model.DriverUser
 		return m.insertFunc(ctx, data)
 	}
 	return sqlmockResult{1, 1}, nil
+}
+
+func (m *mockDriverUserModel) InsertWithConn(ctx context.Context, session sqlx.Session, data *model.DriverUser) (sql.Result, error) {
+	return sqlmockResult{1, 1}, nil
+}
+
+func (m *mockDriverUserModel) FindByPhoneWithConn(ctx context.Context, session sqlx.Session, phone string) (*model.DriverUser, error) {
+	return nil, nil
+}
+
+func (m *mockDriverUserModel) FindDriverDetail(ctx context.Context, driverId int64) (*model.DriverUser, *model.DriverCarBinding, *model.Car, error) {
+	return nil, nil, nil, nil
 }
 
 func (m *mockDriverUserModel) Update(ctx context.Context, data *model.DriverUser) error { return nil }
@@ -184,7 +207,7 @@ func TestLoginLogic_Login_NotFound(t *testing.T) {
 	ctx := context.Background()
 	mockUser := &mockDriverUserModel{
 		findByPhoneFunc: func(ctx context.Context, phone string) (*model.DriverUser, error) {
-			return nil, nil
+			return nil, model.ErrNotFound
 		},
 	}
 

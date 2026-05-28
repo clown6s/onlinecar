@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"onlinecar-common/errorx"
-	"onlinecar-gateway/common/validate"
+	"onlinecar-common/validate"
 	"onlinecar-gateway/internal/svc"
 
 	"github.com/zeromicro/go-zero/core/logx"
@@ -76,9 +76,14 @@ func (l *SendSmsLogic) SendSms(phone string) error {
 	return nil
 }
 
-// incrVerifyScript 原子化 Incr + Expire（防止进程崩溃导致 key 永久无 TTL）
-const incrVerifyScript = `
-local count = redis.call('INCR', KEYS[1])
+// checkAndIncrVerifyScript 原子检查+递增验证失败次数（防止 TOCTOU 竞态）
+// 返回 -2 表示已超过最大尝试次数，否则返回当前计数
+const checkAndIncrVerifyScript = `
+local count = redis.call('GET', KEYS[1])
+if count and tonumber(count) >= tonumber(ARGV[2]) then
+	return -2
+end
+count = redis.call('INCR', KEYS[1])
 if count == 1 then
 	redis.call('EXPIRE', KEYS[1], ARGV[1])
 end
@@ -105,15 +110,9 @@ func VerifyCode(ctx context.Context, svcCtx *svc.ServiceContext, role, phone, co
 		return errorx.ErrParam
 	}
 
-	// 暴力破解防护：检查验证失败次数
+	// 暴力破解防护：verifyKey 在验证失败时原子检查+递增（见下方 case 0）
+	// 避免先 GET 后 INCR 的 TOCTOU 竞态
 	verifyKey := fmt.Sprintf("%s%s:%s", verifyPrefix, role, phone)
-	verifyCount, err := svcCtx.Redis.Get(verifyKey)
-	if err == nil && verifyCount != "" {
-		var count int
-		if _, scanErr := fmt.Sscanf(verifyCount, "%d", &count); scanErr == nil && count >= maxVerifyAttempts {
-			return errorx.ErrSmsTooManyAttempts
-		}
-	}
 
 	codeKey := fmt.Sprintf("%s%s:%s", codePrefix, role, phone)
 
@@ -130,13 +129,21 @@ func VerifyCode(ctx context.Context, svcCtx *svc.ServiceContext, role, phone, co
 		case -1:
 			return errorx.ErrSmsCodeExpired
 		case 0:
-			_, incrErr := svcCtx.Redis.Eval(incrVerifyScript, []string{verifyKey}, int(verifyTTL.Seconds()))
-			if incrErr != nil {
-				logx.Errorf("[SMS] 暴力破解计数器递增失败, verifyKey=%s, err=%v", verifyKey, incrErr)
+			checkResult, checkErr := svcCtx.Redis.Eval(checkAndIncrVerifyScript, []string{verifyKey}, int(verifyTTL.Seconds()), maxVerifyAttempts)
+			if checkErr != nil {
+				logx.Errorf("[SMS] 暴力破解检查+递增失败, verifyKey=%s, err=%v", verifyKey, checkErr)
+			}
+			if cr, ok := checkResult.(int64); ok && cr == -2 {
+				return errorx.ErrSmsTooManyAttempts
+			}
+			if cs, ok := checkResult.(string); ok && cs == "-2" {
+				return errorx.ErrSmsTooManyAttempts
 			}
 			return errorx.ErrSmsCodeError
 		case 1:
-			svcCtx.Redis.Del(verifyKey)
+			if _, delErr := svcCtx.Redis.Del(verifyKey); delErr != nil {
+				logx.Errorf("[SMS] 删除验证计数器失败(成功后), verifyKey=%s, err=%v", verifyKey, delErr)
+			}
 			return nil
 		}
 	case string:
@@ -145,13 +152,21 @@ func VerifyCode(ctx context.Context, svcCtx *svc.ServiceContext, role, phone, co
 		case "-1":
 			return errorx.ErrSmsCodeExpired
 		case "0":
-			_, incrErr := svcCtx.Redis.Eval(incrVerifyScript, []string{verifyKey}, int(verifyTTL.Seconds()))
-			if incrErr != nil {
-				logx.Errorf("[SMS] 暴力破解计数器递增失败(字符串返回), verifyKey=%s, err=%v", verifyKey, incrErr)
+			checkResult, checkErr := svcCtx.Redis.Eval(checkAndIncrVerifyScript, []string{verifyKey}, int(verifyTTL.Seconds()), maxVerifyAttempts)
+			if checkErr != nil {
+				logx.Errorf("[SMS] 暴力破解检查+递增失败(字符串返回), verifyKey=%s, err=%v", verifyKey, checkErr)
+			}
+			if cr, ok := checkResult.(int64); ok && cr == -2 {
+				return errorx.ErrSmsTooManyAttempts
+			}
+			if cs, ok := checkResult.(string); ok && cs == "-2" {
+				return errorx.ErrSmsTooManyAttempts
 			}
 			return errorx.ErrSmsCodeError
 		case "1":
-			svcCtx.Redis.Del(verifyKey)
+			if _, delErr := svcCtx.Redis.Del(verifyKey); delErr != nil {
+				logx.Errorf("[SMS] 删除验证计数器失败(字符串成功后), verifyKey=%s, err=%v", verifyKey, delErr)
+			}
 			return nil
 		}
 	}

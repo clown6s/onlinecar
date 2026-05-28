@@ -28,27 +28,26 @@ type (
 	}
 
 	defaultDistrictService struct {
-		cli zrpc.Client
+		cli    zrpc.Client
+		client pb.DistrictServiceClient
 	}
 )
 
 func NewDistrictService(cli zrpc.Client) DistrictService {
 	return &defaultDistrictService{
-		cli: cli,
+		cli:    cli,
+		client: pb.NewDistrictServiceClient(cli.Conn()),
 	}
 }
 
 func (m *defaultDistrictService) GetProvinces(ctx context.Context, in *GetProvincesReq, opts ...grpc.CallOption) (*GetProvincesResp, error) {
-	client := pb.NewDistrictServiceClient(m.cli.Conn())
-	return client.GetProvinces(ctx, in, opts...)
+	return m.client.GetProvinces(ctx, in, opts...)
 }
 
 func (m *defaultDistrictService) GetChildren(ctx context.Context, in *GetChildrenReq, opts ...grpc.CallOption) (*GetChildrenResp, error) {
-	client := pb.NewDistrictServiceClient(m.cli.Conn())
-	return client.GetChildren(ctx, in, opts...)
+	return m.client.GetChildren(ctx, in, opts...)
 }
 
 func (m *defaultDistrictService) UpdateDistrict(ctx context.Context, in *UpdateDistrictReq, opts ...grpc.CallOption) (*UpdateDistrictResp, error) {
-	client := pb.NewDistrictServiceClient(m.cli.Conn())
-	return client.UpdateDistrict(ctx, in, opts...)
+	return m.client.UpdateDistrict(ctx, in, opts...)
 }

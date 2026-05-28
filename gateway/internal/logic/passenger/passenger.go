@@ -113,6 +113,6 @@ func (l *LoginLogic) Login(req *types.PassengerLoginReq) (*LoginResp, error) {
 	l.Infof("乘客登录成功, passengerId=%d, name=%s", resp.Id, resp.PassengerName)
 	return &LoginResp{
 		Token:     tokenStr,
-		ExpiresIn: int64(conf.AccessExpire.Seconds()),
+		ExpiresIn: max(int64(conf.AccessExpire.Seconds()), 1),
 	}, nil
 }
