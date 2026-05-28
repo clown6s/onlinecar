@@ -3,10 +3,10 @@ package passengerlogic
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"unicode/utf8"
 
 	"onlinecar-common/errorx"
+	"onlinecar-common/validate"
 	"onlinecar-passenger/internal/model"
 	"onlinecar-passenger/internal/svc"
 	"onlinecar-passenger/pb"
@@ -14,8 +14,6 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
-
-var phoneRegex = regexp.MustCompile(`^1[3-9]\d{9}$`)
 
 type RegisterLogic struct {
 	ctx    context.Context
@@ -36,7 +34,7 @@ func (l *RegisterLogic) Register(in *pb.RegisterReq) (*pb.RegisterResp, error) {
 	l.Infof("乘客注册, phone=%s, name=%s", in.PassengerPhone, in.PassengerName)
 
 	// 输入校验
-	if !phoneRegex.MatchString(in.PassengerPhone) {
+	if !validate.IsValidPhone(in.PassengerPhone) {
 		return nil, errorx.ErrPhoneFormat
 	}
 	if utf8.RuneCountInString(in.PassengerName) < 2 || utf8.RuneCountInString(in.PassengerName) > 20 {

@@ -122,6 +122,16 @@ func main() {
 	srv.Start()
 }
 
+// driverLocationExpireThreshold 司机位置数据过期阈值（24 小时）
+const driverLocationExpireThreshold = 24 * time.Hour
+
+// removeExpiredLocationScript 原子移除过期司机的位置数据和更新时间戳
+const removeExpiredLocationScript = `
+redis.call('ZREM', KEYS[1], ARGV[1])
+redis.call('HDEL', KEYS[2], ARGV[1])
+return 1
+`
+
 // cleanExpiredDriverLocations 每小时清理超过 24 小时未更新位置的司机数据
 func cleanExpiredDriverLocations(ctx context.Context, svcCtx *svc.ServiceContext) {
 	ticker := time.NewTicker(1 * time.Hour)
@@ -129,7 +139,7 @@ func cleanExpiredDriverLocations(ctx context.Context, svcCtx *svc.ServiceContext
 
 	locationKey := "driver:location"
 	lastUpdateKey := "driver:last_update"
-	expireThreshold := int64((24 * time.Hour).Seconds())
+	expireThreshold := int64(driverLocationExpireThreshold.Seconds())
 
 	for {
 		select {
@@ -158,12 +168,7 @@ func cleanExpiredDriverLocations(ctx context.Context, svcCtx *svc.ServiceContext
 					}
 					if now-lastUpdate > expireThreshold {
 						// 使用 Lua 脚本原子移除过期司机的位置数据和更新时间戳
-						removeScript := `
-redis.call('ZREM', KEYS[1], ARGV[1])
-redis.call('HDEL', KEYS[2], ARGV[1])
-return 1
-`
-						if _, err := svcCtx.Redis.Eval(removeScript, []string{locationKey, lastUpdateKey}, driverId); err != nil {
+						if _, err := svcCtx.Redis.Eval(removeExpiredLocationScript, []string{locationKey, lastUpdateKey}, driverId); err != nil {
 							logx.Errorf("清理过期司机位置失败, driverId=%s, err=%v", driverId, err)
 							continue
 						}

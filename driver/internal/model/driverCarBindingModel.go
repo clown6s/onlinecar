@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -60,7 +61,7 @@ func (m *defaultDriverCarBindingModel) FindByDriverId(ctx context.Context, drive
 	var resp DriverCarBinding
 	err := m.conn.QueryRowCtx(ctx, &resp, query, driverId)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, err

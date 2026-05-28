@@ -31,7 +31,11 @@ func NewGetChildrenLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetCh
 func (l *GetChildrenLogic) GetChildren(in *pb.GetChildrenReq) (*pb.GetChildrenResp, error) {
 	l.Infof("获取子级行政区, parentAdCode=%d", in.ParentAdCode)
 
-	cacheKey := fmt.Sprintf("%s%d", districtCachePrefix, in.ParentAdCode)
+	// parentAdCode=0 时复用省级缓存 key，避免同一份数据缓存两份
+	cacheKey := fmt.Sprintf("%s%s", districtCachePrefix, "province")
+	if in.ParentAdCode != 0 {
+		cacheKey = fmt.Sprintf("%s%d", districtCachePrefix, in.ParentAdCode)
+	}
 
 	// 1. 尝试读缓存
 	cached, err := l.svcCtx.Redis.Get(cacheKey)

@@ -3,6 +3,7 @@ package trip
 import (
 	"math"
 	"net/http"
+	"unicode/utf8"
 
 	"onlinecar-common/errorx"
 	"onlinecar-gateway/common/response"
@@ -26,6 +27,14 @@ func CreateTripHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		}
 		if req.Destination == "" {
 			response.Error(w, http.StatusBadRequest, errorx.ErrCodeParam, "目的地不能为空")
+			return
+		}
+		if utf8.RuneCountInString(req.Origin) > 200 {
+			response.Error(w, http.StatusBadRequest, errorx.ErrCodeParam, "出发地地址过长")
+			return
+		}
+		if utf8.RuneCountInString(req.Destination) > 200 {
+			response.Error(w, http.StatusBadRequest, errorx.ErrCodeParam, "目的地地址过长")
 			return
 		}
 		if math.IsNaN(req.OriginLng) || math.IsInf(req.OriginLng, 0) || req.OriginLng < -180 || req.OriginLng > 180 {

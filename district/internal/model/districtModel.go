@@ -73,7 +73,7 @@ func (m *defaultDistrictModel) FindOne(ctx context.Context, id int64) (*District
 	var resp District
 	err := m.conn.QueryRowCtx(ctx, &resp, query, id)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, err
@@ -86,7 +86,7 @@ func (m *defaultDistrictModel) FindByAdCode(ctx context.Context, adCode uint32) 
 	var resp District
 	err := m.conn.QueryRowCtx(ctx, &resp, query, adCode)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, err

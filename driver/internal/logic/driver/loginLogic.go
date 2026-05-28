@@ -3,17 +3,15 @@ package driverlogic
 import (
 	"context"
 	"errors"
-	"regexp"
 
 	"onlinecar-common/errorx"
+	"onlinecar-common/validate"
 	"onlinecar-driver/internal/model"
 	"onlinecar-driver/internal/svc"
 	"onlinecar-driver/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
-
-var loginPhoneRegex = regexp.MustCompile(`^1[3-9]\d{9}$`)
 
 type LoginLogic struct {
 	ctx    context.Context
@@ -34,7 +32,7 @@ func (l *LoginLogic) Login(in *pb.LoginReq) (*pb.LoginResp, error) {
 	l.Infof("司机登录, phone=%s", in.DriverPhone)
 
 	// 手机号格式校验
-	if !loginPhoneRegex.MatchString(in.DriverPhone) {
+	if !validate.IsValidPhone(in.DriverPhone) {
 		return nil, errorx.ErrPhoneFormat
 	}
 

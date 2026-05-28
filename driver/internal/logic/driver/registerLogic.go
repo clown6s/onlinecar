@@ -3,11 +3,11 @@ package driverlogic
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"time"
 	"unicode/utf8"
 
 	"onlinecar-common/errorx"
+	"onlinecar-common/validate"
 	"onlinecar-driver/internal/model"
 	"onlinecar-driver/internal/svc"
 	"onlinecar-driver/pb"
@@ -15,8 +15,6 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
-
-var phoneRegex = regexp.MustCompile(`^1[3-9]\d{9}$`)
 
 type RegisterLogic struct {
 	ctx    context.Context
@@ -37,7 +35,7 @@ func (l *RegisterLogic) Register(in *pb.RegisterReq) (*pb.RegisterResp, error) {
 	l.Infof("司机注册, phone=%s, name=%s", in.DriverPhone, in.DriverName)
 
 	// 手机号格式校验
-	if !phoneRegex.MatchString(in.DriverPhone) {
+	if !validate.IsValidPhone(in.DriverPhone) {
 		return nil, errorx.ErrPhoneFormat
 	}
 

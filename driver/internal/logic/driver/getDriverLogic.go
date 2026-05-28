@@ -3,8 +3,8 @@ package driverlogic
 import (
 	"context"
 	"errors"
-	"fmt"
 
+	"onlinecar-common/errorx"
 	"onlinecar-driver/internal/model"
 	"onlinecar-driver/internal/svc"
 	"onlinecar-driver/pb"
@@ -33,10 +33,10 @@ func (l *GetDriverLogic) GetDriver(in *pb.GetDriverReq) (*pb.DriverInfo, error) 
 	driverUser, _, car, err := l.svcCtx.DriverUserModel.FindDriverDetail(l.ctx, in.Id)
 	if err != nil {
 		if errors.Is(err, model.ErrNotFound) {
-			return nil, fmt.Errorf("司机不存在")
+			return nil, errorx.ErrUserNotFound
 		}
 		l.Errorf("查询司机失败, driverId=%d, err=%v", in.Id, err)
-		return nil, fmt.Errorf("查询失败，请稍后重试")
+		return nil, errorx.ErrServer
 	}
 
 	info := &pb.DriverInfo{

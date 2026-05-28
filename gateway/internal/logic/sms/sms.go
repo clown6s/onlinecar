@@ -110,8 +110,7 @@ func VerifyCode(ctx context.Context, svcCtx *svc.ServiceContext, role, phone, co
 	verifyCount, err := svcCtx.Redis.Get(verifyKey)
 	if err == nil && verifyCount != "" {
 		var count int
-		fmt.Sscanf(verifyCount, "%d", &count)
-		if count >= maxVerifyAttempts {
+		if _, scanErr := fmt.Sscanf(verifyCount, "%d", &count); scanErr == nil && count >= maxVerifyAttempts {
 			return errorx.ErrSmsTooManyAttempts
 		}
 	}
@@ -131,7 +130,10 @@ func VerifyCode(ctx context.Context, svcCtx *svc.ServiceContext, role, phone, co
 		case -1:
 			return errorx.ErrSmsCodeExpired
 		case 0:
-			svcCtx.Redis.Eval(incrVerifyScript, []string{verifyKey}, int(verifyTTL.Seconds()))
+			_, incrErr := svcCtx.Redis.Eval(incrVerifyScript, []string{verifyKey}, int(verifyTTL.Seconds()))
+			if incrErr != nil {
+				logx.Errorf("[SMS] 暴力破解计数器递增失败, verifyKey=%s, err=%v", verifyKey, incrErr)
+			}
 			return errorx.ErrSmsCodeError
 		case 1:
 			svcCtx.Redis.Del(verifyKey)
@@ -143,7 +145,10 @@ func VerifyCode(ctx context.Context, svcCtx *svc.ServiceContext, role, phone, co
 		case "-1":
 			return errorx.ErrSmsCodeExpired
 		case "0":
-			svcCtx.Redis.Eval(incrVerifyScript, []string{verifyKey}, int(verifyTTL.Seconds()))
+			_, incrErr := svcCtx.Redis.Eval(incrVerifyScript, []string{verifyKey}, int(verifyTTL.Seconds()))
+			if incrErr != nil {
+				logx.Errorf("[SMS] 暴力破解计数器递增失败(字符串返回), verifyKey=%s, err=%v", verifyKey, incrErr)
+			}
 			return errorx.ErrSmsCodeError
 		case "1":
 			svcCtx.Redis.Del(verifyKey)

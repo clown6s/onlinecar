@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"onlinecar-common/errorx"
+	"onlinecar-common/validate"
 	"onlinecar-passenger/internal/model"
 	"onlinecar-passenger/internal/svc"
 	"onlinecar-passenger/pb"
@@ -31,7 +32,7 @@ func (l *LoginLogic) Login(in *pb.LoginReq) (*pb.LoginResp, error) {
 	l.Infof("乘客登录, phone=%s", in.PassengerPhone)
 
 	// 输入校验
-	if !phoneRegex.MatchString(in.PassengerPhone) {
+	if !validate.IsValidPhone(in.PassengerPhone) {
 		return nil, errorx.ErrPhoneFormat
 	}
 

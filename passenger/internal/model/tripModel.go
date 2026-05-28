@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
@@ -100,7 +99,7 @@ func (m *defaultTripModel) FindOne(ctx context.Context, id int64) (*Trip, error)
 	err := m.conn.QueryRowCtx(ctx, &resp, query, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+			return nil, ErrNotFound
 		}
 		return nil, err
 	}
@@ -162,8 +161,6 @@ func (m *defaultTripModel) FindActiveTrips(ctx context.Context, passengerId int6
 
 	query := fmt.Sprintf("SELECT %s FROM %s WHERE `passenger_id` = ? AND `status` IN (%s) ORDER BY `id` DESC LIMIT 1",
 		strings.Join(tripFieldNames, ","), m.table, strings.Join(placeholders, ","))
-
-	logx.Debugf("FindActiveTrips query: %s, args: %v", query, args)
 
 	var trips []*Trip
 	err := m.conn.QueryRowsCtx(ctx, &trips, query, args...)

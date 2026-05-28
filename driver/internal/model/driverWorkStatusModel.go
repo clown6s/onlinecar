@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -58,7 +59,7 @@ func (m *defaultDriverWorkStatusModel) FindByDriverId(ctx context.Context, drive
 	var resp DriverWorkStatus
 	err := m.conn.QueryRowCtx(ctx, &resp, query, driverId)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, err

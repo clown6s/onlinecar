@@ -39,42 +39,39 @@ type (
 	}
 
 	defaultPassenger struct {
-		cli zrpc.Client
+		cli    zrpc.Client
+		client pb.PassengerClient
 	}
 )
 
 func NewPassenger(cli zrpc.Client) Passenger {
 	return &defaultPassenger{
-		cli: cli,
+		cli:    cli,
+		client: pb.NewPassengerClient(cli.Conn()),
 	}
 }
 
 // 注册
 func (m *defaultPassenger) Register(ctx context.Context, in *RegisterReq, opts ...grpc.CallOption) (*RegisterResp, error) {
-	client := pb.NewPassengerClient(m.cli.Conn())
-	return client.Register(ctx, in, opts...)
+	return m.client.Register(ctx, in, opts...)
 }
 
 // 登录
 func (m *defaultPassenger) Login(ctx context.Context, in *LoginReq, opts ...grpc.CallOption) (*LoginResp, error) {
-	client := pb.NewPassengerClient(m.cli.Conn())
-	return client.Login(ctx, in, opts...)
+	return m.client.Login(ctx, in, opts...)
 }
 
 // 获取乘客信息
 func (m *defaultPassenger) GetPassenger(ctx context.Context, in *GetPassengerReq, opts ...grpc.CallOption) (*PassengerInfo, error) {
-	client := pb.NewPassengerClient(m.cli.Conn())
-	return client.GetPassenger(ctx, in, opts...)
+	return m.client.GetPassenger(ctx, in, opts...)
 }
 
 // 创建行程
 func (m *defaultPassenger) CreateTrip(ctx context.Context, in *CreateTripReq, opts ...grpc.CallOption) (*TripResp, error) {
-	client := pb.NewPassengerClient(m.cli.Conn())
-	return client.CreateTrip(ctx, in, opts...)
+	return m.client.CreateTrip(ctx, in, opts...)
 }
 
 // 检查手机号是否注册
 func (m *defaultPassenger) CheckPhone(ctx context.Context, in *CheckPhoneReq, opts ...grpc.CallOption) (*CheckPhoneResp, error) {
-	client := pb.NewPassengerClient(m.cli.Conn())
-	return client.CheckPhone(ctx, in, opts...)
+	return m.client.CheckPhone(ctx, in, opts...)
 }
