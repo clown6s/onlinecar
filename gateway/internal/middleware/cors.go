@@ -6,6 +6,8 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
+// CORSMiddleware 精确匹配 Origin（区分 localhost / 127.0.0.1 和端口变体）
+// 注意：如果前端同时使用 http://localhost:3000 和 http://127.0.0.1:3000，需在配置中都列出
 type CORSMiddleware struct {
 	allowOrigins []string
 }

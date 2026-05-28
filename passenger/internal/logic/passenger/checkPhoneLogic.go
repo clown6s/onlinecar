@@ -2,9 +2,11 @@ package passengerlogic
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"onlinecar-common/errorx"
+	"onlinecar-passenger/internal/model"
 	"onlinecar-passenger/internal/svc"
 	"onlinecar-passenger/pb"
 
@@ -32,7 +34,7 @@ func (l *CheckPhoneLogic) CheckPhone(in *pb.CheckPhoneReq) (*pb.CheckPhoneResp, 
 	}
 
 	user, err := l.svcCtx.PassengerUserModel.FindByPhone(l.ctx, in.PassengerPhone)
-	if err != nil {
+	if err != nil && !errors.Is(err, model.ErrNotFound) {
 		l.Errorf("查询乘客失败, phone=%s, err=%v", in.PassengerPhone, err)
 		return nil, fmt.Errorf("查询失败，请稍后重试")
 	}

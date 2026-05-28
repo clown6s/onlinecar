@@ -51,6 +51,10 @@ func LoginHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			response.Errorx(w, errorx.ErrPhoneFormat)
 			return
 		}
+		if req.Code == "" {
+			response.Error(w, http.StatusBadRequest, errorx.ErrCodeParam, "验证码不能为空")
+			return
+		}
 		l := passengerlogic.NewLoginLogic(r.Context(), svcCtx)
 		resp, err := l.Login(&req)
 		response.Response(w, resp, err)

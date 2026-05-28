@@ -18,13 +18,18 @@ import (
 
 type JWTAuthMiddleware struct {
 	Secret string
+	Role   string // "driver" 或 "passenger"，为空时不校验角色
 }
 
-func NewJWTAuthMiddleware(secret string) *JWTAuthMiddleware {
+func NewJWTAuthMiddleware(secret string, role ...string) *JWTAuthMiddleware {
 	if secret == "" {
 		logx.Must(fmt.Errorf("JWT secret must not be empty"))
 	}
-	return &JWTAuthMiddleware{Secret: secret}
+	m := &JWTAuthMiddleware{Secret: secret}
+	if len(role) > 0 {
+		m.Role = role[0]
+	}
+	return m
 }
 
 func (m *JWTAuthMiddleware) Handle(next http.HandlerFunc) http.HandlerFunc {
@@ -65,6 +70,17 @@ func (m *JWTAuthMiddleware) Handle(next http.HandlerFunc) http.HandlerFunc {
 				r.Method, r.URL.Path, r.RemoteAddr)
 			httpx.Error(w, errorx.ErrTokenInvalid)
 			return
+		}
+
+		// 纵深防御：校验 role claim（防止 JWT secret 配置错误导致跨角色访问）
+		if m.Role != "" {
+			roleVal, ok := claims["role"].(string)
+			if !ok || roleVal != m.Role {
+				logx.Errorf("认证失败: token role不匹配, expect=%s, got=%s, method=%s, path=%s",
+					m.Role, roleVal, r.Method, r.URL.Path)
+				httpx.Error(w, errorx.ErrTokenInvalid)
+				return
+			}
 		}
 
 		uidFloat, ok := claims["uid"].(float64)

@@ -2,8 +2,10 @@ package passengerlogic
 
 import (
 	"context"
+	"errors"
 
 	"onlinecar-common/errorx"
+	"onlinecar-passenger/internal/model"
 	"onlinecar-passenger/internal/svc"
 	"onlinecar-passenger/pb"
 
@@ -35,14 +37,15 @@ func (l *LoginLogic) Login(in *pb.LoginReq) (*pb.LoginResp, error) {
 
 	passengerUser, err := l.svcCtx.PassengerUserModel.FindByPhone(l.ctx, in.PassengerPhone)
 	if err != nil {
+		if errors.Is(err, model.ErrNotFound) {
+			// 统一返回模糊信息，避免暴露注册状态（与 driver 对齐）
+			return nil, errorx.NewCodeError(errorx.ErrAuth.Code, "手机号或验证码错误")
+		}
 		if codeErr, ok := err.(*errorx.CodeError); ok {
 			return nil, codeErr
 		}
-		logx.Errorf("查询乘客失败, phone=%s, err=%v", in.PassengerPhone, err)
+		l.Errorf("查询乘客失败, phone=%s, err=%v", in.PassengerPhone, err)
 		return nil, errorx.ErrServer
-	}
-	if passengerUser == nil {
-		return nil, errorx.ErrUserNotFound
 	}
 
 	resp := &pb.LoginResp{

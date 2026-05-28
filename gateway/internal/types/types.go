@@ -5,6 +5,7 @@ package types
 type DriverRegisterReq struct {
 	Name           string `json:"name"`
 	Phone          string `json:"phone"`
+	Code           string `json:"code"`
 	VehicleNo      string `json:"vehicleNo"`
 	VehicleType    string `json:"vehicleType"`
 	CommercialType int64  `json:"commercialType,omitempty"`
@@ -38,6 +39,7 @@ type DriverResp struct {
 type PassengerRegisterReq struct {
 	Name   string `json:"name"`
 	Phone  string `json:"phone"`
+	Code   string `json:"code"`
 	Gender int64  `json:"gender,omitempty"`
 }
 

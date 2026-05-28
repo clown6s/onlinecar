@@ -30,6 +30,14 @@ func NewRegisterLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Register
 func (l *RegisterLogic) Register(req *types.DriverRegisterReq) (*types.DriverResp, error) {
 	l.Infof("Gateway->DriverRpc.Register, phone=%s, name=%s", req.Phone, req.Name)
 
+	// 注册前校验验证码，防止为任意手机号注册账号
+	if req.Code == "" {
+		return nil, errorx.ErrParam
+	}
+	if err := sms.VerifyCode(l.ctx, l.svcCtx, "driver", req.Phone, req.Code); err != nil {
+		return nil, err
+	}
+
 	// 直接调用 Register RPC，由 RPC 服务端数据库 UNIQUE 约束保证手机号唯一性
 	resp, err := l.svcCtx.DriverRpc.Register(l.ctx, &driverpb.RegisterReq{
 		DriverName:     req.Name,

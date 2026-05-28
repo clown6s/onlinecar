@@ -57,8 +57,24 @@ return 1
 		l.Errorf("Redis GEOADD 失败, driverId=%d, err=%v", in.Id, err)
 		return nil, fmt.Errorf("更新位置失败")
 	}
-	if result == nil || result.(int64) != 1 {
-		l.Errorf("更新司机位置返回异常: driverId=%d, result=%v", in.Id, result)
+	if result == nil {
+		l.Errorf("Redis Lua 返回 nil, driverId=%d", in.Id)
+		return nil, fmt.Errorf("更新位置失败")
+	}
+	// Lua 返回值类型可能是 int64 或 string，安全处理
+	var resultCode int64
+	switch v := result.(type) {
+	case int64:
+		resultCode = v
+	case string:
+		l.Errorf("Redis Lua 返回非预期类型 string: %s, driverId=%d", v, in.Id)
+		return nil, fmt.Errorf("更新位置失败")
+	default:
+		l.Errorf("Redis Lua 返回非预期类型 %T: %v, driverId=%d", result, result, in.Id)
+		return nil, fmt.Errorf("更新位置失败")
+	}
+	if resultCode != 1 {
+		l.Errorf("更新司机位置返回异常: driverId=%d, result=%d", in.Id, resultCode)
 		return nil, fmt.Errorf("更新位置失败")
 	}
 

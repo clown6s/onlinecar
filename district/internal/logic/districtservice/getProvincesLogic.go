@@ -115,6 +115,11 @@ func (l *GetProvincesLogic) GetProvinces(in *pb.GetProvincesReq) (*pb.GetProvinc
 		return nil, sfErr
 	}
 
-	l.Infof("查询省级行政区成功, count=%d", v.(*pb.GetProvincesResp).List)
-	return v.(*pb.GetProvincesResp), nil
+	resp, ok := v.(*pb.GetProvincesResp)
+	if !ok {
+		return nil, fmt.Errorf("singleflight returned unexpected type: %T", v)
+	}
+
+	l.Infof("查询省级行政区成功, count=%d", resp.List)
+	return resp, nil
 }

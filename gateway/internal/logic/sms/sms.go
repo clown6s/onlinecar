@@ -47,9 +47,8 @@ func (l *SendSmsLogic) SendSms(phone string) error {
 		return errorx.NewCodeError(errorx.ErrCodeSmsSendFrequent, "发送过于频繁，请60秒后再试")
 	}
 
-	// 发送新验证码时删除旧的 verify 计数 key，防止旧验证码继续试
-	verifyKey := fmt.Sprintf("%s%s:%s", verifyPrefix, l.role, phone)
-	_, _ = l.svcCtx.Redis.Del(verifyKey)
+	// 发送新验证码时，不删除旧的 verify 计数 key（防止重置暴力破解计数器）
+	// verifyKey 仅在验证成功或 TTL 自然过期时清除
 
 	// 生成 6 位随机验证码
 	n, _ := rand.Int(rand.Reader, big.NewInt(1000000))
@@ -77,7 +76,14 @@ func (l *SendSmsLogic) SendSms(phone string) error {
 	return nil
 }
 
-// verifyCodeScript 原子化验证码校验+删除（防并发重放）
+// incrVerifyScript 原子化 Incr + Expire（防止进程崩溃导致 key 永久无 TTL）
+const incrVerifyScript = `
+local count = redis.call('INCR', KEYS[1])
+if count == 1 then
+	redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return count
+`
 const verifyCodeScript = `
 local stored = redis.call('GET', KEYS[1])
 if not stored or stored == '' then
@@ -106,7 +112,7 @@ func VerifyCode(ctx context.Context, svcCtx *svc.ServiceContext, role, phone, co
 		var count int
 		fmt.Sscanf(verifyCount, "%d", &count)
 		if count >= maxVerifyAttempts {
-			return errorx.NewCodeError(errorx.ErrCodeSmsCodeError+900, "验证码错误次数过多，请稍后再试")
+			return errorx.ErrSmsTooManyAttempts
 		}
 	}
 
@@ -125,8 +131,7 @@ func VerifyCode(ctx context.Context, svcCtx *svc.ServiceContext, role, phone, co
 		case -1:
 			return errorx.ErrSmsCodeExpired
 		case 0:
-			svcCtx.Redis.Incr(verifyKey)
-			svcCtx.Redis.Expire(verifyKey, int(verifyTTL.Seconds()))
+			svcCtx.Redis.Eval(incrVerifyScript, []string{verifyKey}, int(verifyTTL.Seconds()))
 			return errorx.ErrSmsCodeError
 		case 1:
 			svcCtx.Redis.Del(verifyKey)
@@ -138,8 +143,7 @@ func VerifyCode(ctx context.Context, svcCtx *svc.ServiceContext, role, phone, co
 		case "-1":
 			return errorx.ErrSmsCodeExpired
 		case "0":
-			svcCtx.Redis.Incr(verifyKey)
-			svcCtx.Redis.Expire(verifyKey, int(verifyTTL.Seconds()))
+			svcCtx.Redis.Eval(incrVerifyScript, []string{verifyKey}, int(verifyTTL.Seconds()))
 			return errorx.ErrSmsCodeError
 		case "1":
 			svcCtx.Redis.Del(verifyKey)

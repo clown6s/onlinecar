@@ -111,6 +111,11 @@ func (l *GetChildrenLogic) GetChildren(in *pb.GetChildrenReq) (*pb.GetChildrenRe
 		return nil, sfErr
 	}
 
-	l.Infof("查询子级行政区成功, parentAdCode=%d, count=%d", in.ParentAdCode, v.(*pb.GetChildrenResp).List)
-	return v.(*pb.GetChildrenResp), nil
+	resp, ok := v.(*pb.GetChildrenResp)
+	if !ok {
+		return nil, fmt.Errorf("singleflight returned unexpected type: %T", v)
+	}
+
+	l.Infof("查询子级行政区成功, parentAdCode=%d, count=%d", in.ParentAdCode, resp.List)
+	return resp, nil
 }

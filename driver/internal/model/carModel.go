@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -29,6 +30,7 @@ type (
 		InsertWithConn(ctx context.Context, session sqlx.Session, data *Car) (sql.Result, error)
 		FindOne(ctx context.Context, id int64) (*Car, error)
 		FindByVehicleNo(ctx context.Context, vehicleNo string) (*Car, error)
+		FindByVehicleNoWithConn(ctx context.Context, session sqlx.Session, vehicleNo string) (*Car, error)
 		Update(ctx context.Context, data *Car) error
 		Delete(ctx context.Context, id int64) error
 	}
@@ -111,7 +113,7 @@ func (m *defaultCarModel) FindOne(ctx context.Context, id int64) (*Car, error) {
 	var resp Car
 	err := m.conn.QueryRowCtx(ctx, &resp, query, id)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, err
@@ -124,7 +126,7 @@ func (m *defaultCarModel) FindByVehicleNo(ctx context.Context, vehicleNo string)
 	var resp Car
 	err := m.conn.QueryRowCtx(ctx, &resp, query, vehicleNo)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, err
@@ -156,6 +158,20 @@ func (m *defaultCarModel) Delete(ctx context.Context, id int64) error {
 	query := fmt.Sprintf("DELETE FROM %s WHERE `id` = ?", m.table)
 	_, err := m.conn.ExecCtx(ctx, query, id)
 	return err
+}
+
+// FindByVehicleNoWithConn 使用指定 session 查询车辆（事务内使用）
+func (m *defaultCarModel) FindByVehicleNoWithConn(ctx context.Context, session sqlx.Session, vehicleNo string) (*Car, error) {
+	query := fmt.Sprintf("SELECT %s FROM %s WHERE `vehicle_no` = ? LIMIT 1", strings.Join(carFieldNames, ","), m.table)
+	var resp Car
+	err := session.QueryRowCtx(ctx, &resp, query, vehicleNo)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return &resp, nil
 }
 
 // InsertWithConn 使用指定连接执行插入（事务内使用）

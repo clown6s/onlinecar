@@ -33,12 +33,10 @@ func main() {
 	defer server.Stop()
 
 	ctx := svc.NewServiceContext(c)
+	defer ctx.Close()
 	defer middleware.StopRateLimiters()
 
-	cacheCtx, cacheCancel := context.WithCancel(context.Background())
-	defer cacheCancel()
-	ctx.ProvinceCache.Start(cacheCtx)
-	defer ctx.ProvinceCache.Stop()
+	ctx.ProvinceCache.Start(context.Background())
 
 	handler.RegisterHandlers(server, ctx)
 

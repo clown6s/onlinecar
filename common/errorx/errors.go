@@ -76,14 +76,15 @@ const (
 	ErrCodeParam = 400
 
 	// 用户相关 10001-10099
-	ErrCodePhoneRegistered = 10001
-	ErrCodeUserNotFound    = 10002
-	ErrCodeUserDisabled    = 10003 // 原编号10004，调整为10003消除间隙
-	ErrCodeSmsCodeExpired  = 10004 // 原编号10005，顺延调整
-	ErrCodeSmsCodeError    = 10005 // 原编号10006，顺延调整
-	ErrCodeSmsSendFailed   = 10006 // 原编号10007，顺延调整
-	ErrCodeSmsSendFrequent = 10007 // 原编号10008，顺延调整
-	ErrCodePhoneFormat     = 10008 // 原编号10009，顺延调整
+	ErrCodePhoneRegistered    = 10001
+	ErrCodeUserNotFound       = 10002
+	ErrCodeUserDisabled       = 10003 // 原编号10004，调整为10003消除间隙
+	ErrCodeSmsCodeExpired     = 10004 // 原编号10005，顺延调整
+	ErrCodeSmsCodeError       = 10005 // 原编号10006，顺延调整
+	ErrCodeSmsSendFailed      = 10006 // 原编号10007，顺延调整
+	ErrCodeSmsSendFrequent    = 10007 // 原编号10008，顺延调整
+	ErrCodePhoneFormat        = 10008 // 原编号10009，顺延调整
+	ErrCodeSmsTooManyAttempts = 10009 // 验证码错误次数过多
 
 	// 车辆相关 20001-20099
 	ErrCodeVehicleNotFound = 20001
@@ -111,14 +112,15 @@ const (
 
 var (
 	// 用户
-	ErrPhoneRegistered = NewCodeError(ErrCodePhoneRegistered, "该手机号已注册")
-	ErrUserNotFound    = NewCodeError(ErrCodeUserNotFound, "用户不存在")
-	ErrUserDisabled    = NewCodeError(ErrCodeUserDisabled, "用户已禁用")
-	ErrSmsCodeExpired  = NewCodeError(ErrCodeSmsCodeExpired, "验证码已过期")
-	ErrSmsCodeError    = NewCodeError(ErrCodeSmsCodeError, "验证码错误")
-	ErrSmsSendFailed   = NewCodeError(ErrCodeSmsSendFailed, "发送验证码失败")
-	ErrSmsSendFrequent = NewCodeError(ErrCodeSmsSendFrequent, "发送过于频繁，请60秒后重试")
-	ErrPhoneFormat     = NewCodeError(ErrCodePhoneFormat, "手机号格式不正确")
+	ErrPhoneRegistered    = NewCodeError(ErrCodePhoneRegistered, "该手机号已注册")
+	ErrUserNotFound       = NewCodeError(ErrCodeUserNotFound, "用户不存在")
+	ErrUserDisabled       = NewCodeError(ErrCodeUserDisabled, "用户已禁用")
+	ErrSmsCodeExpired     = NewCodeError(ErrCodeSmsCodeExpired, "验证码已过期")
+	ErrSmsCodeError       = NewCodeError(ErrCodeSmsCodeError, "验证码错误")
+	ErrSmsSendFailed      = NewCodeError(ErrCodeSmsSendFailed, "发送验证码失败")
+	ErrSmsSendFrequent    = NewCodeError(ErrCodeSmsSendFrequent, "发送过于频繁，请60秒后重试")
+	ErrPhoneFormat        = NewCodeError(ErrCodePhoneFormat, "手机号格式不正确")
+	ErrSmsTooManyAttempts = NewCodeError(ErrCodeSmsTooManyAttempts, "验证码错误次数过多，请稍后再试")
 
 	// 车辆
 	ErrVehicleNotFound = NewCodeError(ErrCodeVehicleNotFound, "车辆不存在")
@@ -145,9 +147,102 @@ var (
 )
 
 // SetGrpcBizCode 将业务错误码写入 gRPC trailer，供网关侧 MapRpcError 提取。
-// 在 RPC 服务端 UnaryInterceptor 中返回错误前调用。
+// 在 RPC 服务端 UnaryInterceptor 中 handler 返回错误后调用。
+// 使用 SetTrailer 而非 SetHeader，确保在 error 场景下 trailer 仍能被发送。
 func SetGrpcBizCode(ctx context.Context, bizCode int) {
-	_ = grpc.SetHeader(ctx, metadata.Pairs("x-biz-code", strconv.Itoa(bizCode)))
+	_ = grpc.SetTrailer(ctx, metadata.Pairs("x-biz-code", strconv.Itoa(bizCode)))
+}
+
+// ErrorToBizCode 根据错误消息匹配业务错误码，供 RPC 服务端 UnaryInterceptor 使用。
+// 返回 0 表示未匹配到已知业务错误码。
+func ErrorToBizCode(err error) int {
+	if err == nil {
+		return 0
+	}
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "该手机号已注册"):
+		return ErrCodePhoneRegistered
+	case strings.Contains(msg, "车辆不存在"):
+		return ErrCodeVehicleNotFound
+	case strings.Contains(msg, "司机不存在") || strings.Contains(msg, "用户不存在"):
+		return ErrCodeUserNotFound
+	case strings.Contains(msg, "已禁用") || strings.Contains(msg, "乘客账号已禁用"):
+		return ErrCodeUserDisabled
+	case strings.Contains(msg, "验证码错误"):
+		return ErrCodeSmsCodeError
+	case strings.Contains(msg, "验证码已过期"):
+		return ErrCodeSmsCodeExpired
+	case strings.Contains(msg, "发送过于频繁"):
+		return ErrCodeSmsSendFrequent
+	case strings.Contains(msg, "创建行程失败"):
+		return ErrCodeTripCreateFailed
+	case strings.Contains(msg, "行政区划不存在"):
+		return ErrCodeDistrictNotFound
+	case strings.Contains(msg, "验证码错误次数过多"):
+		return ErrCodeSmsTooManyAttempts
+	case strings.Contains(msg, "车辆已绑定"):
+		return ErrCodeVehicleBound
+	case strings.Contains(msg, "无效的") || strings.Contains(msg, "不能为空") || strings.Contains(msg, "坐标无效"):
+		return ErrCodeParam
+	default:
+		return 0
+	}
+}
+
+// BizCodeToError 根据业务错误码返回对应的 CodeError，供网关侧 MapRpcError 使用。
+// 返回 nil 表示未匹配到已知业务错误码。
+func BizCodeToError(bizCode int) *CodeError {
+	switch bizCode {
+	case ErrCodeParam:
+		return ErrParam
+	case ErrCodePhoneRegistered:
+		return ErrPhoneRegistered
+	case ErrCodeUserNotFound:
+		return ErrUserNotFound
+	case ErrCodeUserDisabled:
+		return ErrUserDisabled
+	case ErrCodeSmsCodeExpired:
+		return ErrSmsCodeExpired
+	case ErrCodeSmsCodeError:
+		return ErrSmsCodeError
+	case ErrCodeSmsSendFailed:
+		return ErrSmsSendFailed
+	case ErrCodeSmsSendFrequent:
+		return ErrSmsSendFrequent
+	case ErrCodePhoneFormat:
+		return ErrPhoneFormat
+	case ErrCodeSmsTooManyAttempts:
+		return ErrSmsTooManyAttempts
+	case ErrCodeVehicleNotFound:
+		return ErrVehicleNotFound
+	case ErrCodeVehicleBound:
+		return ErrVehicleBound
+	case ErrCodeTripNotFound:
+		return ErrTripNotFound
+	case ErrCodeTripStatusInvalid:
+		return ErrTripStatusInvalid
+	case ErrCodeTripCreateFailed:
+		return ErrTripCreateFailed
+	case ErrCodeDistrictNotFound:
+		return ErrDistrictNotFound
+	case ErrCodeTokenExpired:
+		return ErrTokenExpired
+	case ErrCodeTokenInvalid:
+		return ErrTokenInvalid
+	case ErrCodeAuthHeaderMissing:
+		return ErrAuthHeaderMissing
+	case ErrCodeAuthHeaderMalformed:
+		return ErrAuthHeaderMalformed
+	case ErrCodeServiceUnavailable:
+		return ErrServiceUnavailable
+	case ErrCodeRpcCallFailed:
+		return ErrRpcCallFailed
+	case ErrCodeDatabaseError:
+		return ErrDatabaseError
+	default:
+		return nil
+	}
 }
 
 // grpcCodeToHTTP 将 gRPC status code 映射为 HTTP 状态码。
@@ -175,19 +270,31 @@ func grpcCodeToHTTP(code codes.Code) int {
 }
 
 // MapRpcError 将 gRPC 传输过来的错误映射为 CodeError。
-// 优先从 gRPC metadata 的 x-biz-code header 提取结构化业务错误码，
+// 优先从 gRPC trailer 的 x-biz-code 提取结构化业务错误码，
 // 其次按 gRPC status code 做 HTTP 映射，最后退化为字符串匹配作为 fallback。
+//
+// 注意：当前 go-zero zrpc 客户端不直接暴露 gRPC trailer 给调用方，
+// 因此 x-biz-code 路径暂时无法在 Gateway 侧生效，实际走字符串匹配 fallback。
+// RPC 服务端通过 SetGrpcBizCode 写入 trailer 的逻辑已就绪，
+// 将来 zrpc 升级支持 trailer 透传后，只需在此处启用 trailer 读取即可。
 func MapRpcError(err error) *CodeError {
 	if err == nil {
 		return nil
 	}
 
-	// 从 gRPC status 中提取 metadata（trailer 中的 x-biz-code）
+	// 尝试从 gRPC trailer 提取 x-biz-code（预留，当前 zrpc 不透传 trailer）
 	if st, ok := status.FromError(err); ok {
-		// 优先检查 x-biz-code metadata
-		bizCode := -1
-		_ = st.Proto().GetDetails()
-		_ = bizCode
+		// TODO: 当 zrpc 支持 trailer 透传后，取消注释以下代码
+		// trailers := st.Trailers()
+		// for _, md := range trailers {
+		// 	if vals := md.Get("x-biz-code"); len(vals) > 0 {
+		// 		if bizCode, parseErr := strconv.Atoi(vals[0]); parseErr == nil {
+		// 			if ce := BizCodeToError(bizCode); ce != nil {
+		// 				return ce
+		// 			}
+		// 		}
+		// 	}
+		// }
 
 		// 通过 gRPC status code 做基础映射
 		httpCode := grpcCodeToHTTP(st.Code())
@@ -196,6 +303,7 @@ func MapRpcError(err error) *CodeError {
 		}
 	}
 
+	// fallback: 字符串匹配
 	msg := err.Error()
 
 	switch {
@@ -211,8 +319,6 @@ func MapRpcError(err error) *CodeError {
 		return ErrSmsCodeExpired
 	case strings.Contains(msg, "发送过于频繁"):
 		return ErrSmsSendFrequent
-	case strings.Contains(msg, "不存在"):
-		return ErrUserNotFound
 	case strings.Contains(msg, "已禁用"):
 		return ErrUserDisabled
 	case strings.Contains(msg, "无效的"):
@@ -227,6 +333,10 @@ func MapRpcError(err error) *CodeError {
 		return ErrUserDisabled
 	case strings.Contains(msg, "行政区划不存在"):
 		return ErrDistrictNotFound
+	case strings.Contains(msg, "验证码错误次数过多"):
+		return ErrSmsTooManyAttempts
+	case strings.Contains(msg, "车辆已绑定"):
+		return ErrVehicleBound
 	}
 
 	return ErrServer

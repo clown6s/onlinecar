@@ -49,14 +49,14 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 	server.AddRoutes(publicRoutes, rest.WithMaxBytes(1<<20))
 
 	// 司机认证路由（带限流 100 req/s per IP）
-	driverAuth := middleware.NewJWTAuthMiddleware(svcCtx.Config.AuthDriver.GetAccessSecret("ONLINECAR_DRIVER_JWT_SECRET"))
+	driverAuth := middleware.NewJWTAuthMiddleware(svcCtx.Config.AuthDriver.GetAccessSecret("ONLINECAR_DRIVER_JWT_SECRET"), "driver")
 	driverRateLimit := middleware.NewRateLimitMiddleware(100, "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16").Handle
 	server.AddRoutes([]rest.Route{
 		{Method: http.MethodPost, Path: "/api/v1/driver/location", Handler: driverRateLimit(driverAuth.Handle(driverhandler.UpdateLocationHandler(svcCtx)))},
 	}, rest.WithMaxBytes(1<<20))
 
 	// 乘客认证路由（带限流 50 req/s per IP）
-	passengerAuth := middleware.NewJWTAuthMiddleware(svcCtx.Config.AuthPassenger.GetAccessSecret("ONLINECAR_PASSENGER_JWT_SECRET"))
+	passengerAuth := middleware.NewJWTAuthMiddleware(svcCtx.Config.AuthPassenger.GetAccessSecret("ONLINECAR_PASSENGER_JWT_SECRET"), "passenger")
 	passengerRateLimit := middleware.NewRateLimitMiddleware(50, "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16").Handle
 	server.AddRoutes([]rest.Route{
 		{Method: http.MethodPost, Path: "/api/v1/trip", Handler: passengerRateLimit(passengerAuth.Handle(triphandler.CreateTripHandler(svcCtx)))},

@@ -1,6 +1,9 @@
 package svc
 
 import (
+	"os"
+	"time"
+
 	"onlinecar-gateway/common/cache"
 	"onlinecar-gateway/common/sms"
 	"onlinecar-gateway/internal/config"
@@ -26,12 +29,46 @@ type ServiceContext struct {
 	ProvinceCache *cache.ProvinceCache
 }
 
+// Close 优雅关闭所有连接资源
+func (s *ServiceContext) Close() error {
+	var errs []error
+	if s.DriverConn != nil {
+		if err := s.DriverConn.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if s.PassengerConn != nil {
+		if err := s.PassengerConn.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if s.DistrictConn != nil {
+		if err := s.DistrictConn.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if s.ProvinceCache != nil {
+		s.ProvinceCache.Stop()
+	}
+	if len(errs) > 0 {
+		return errs[0]
+	}
+	return nil
+}
+
 func NewServiceContext(c config.Config) *ServiceContext {
 	driverConn := zrpc.MustNewClient(c.DriverRpc)
 	passengerConn := zrpc.MustNewClient(c.PassengerRpc)
 	districtConn := zrpc.MustNewClient(c.DistrictRpc)
 
 	districtClient := districtpb.NewDistrictServiceClient(districtConn.Conn())
+
+	// 短信发送器：通过环境变量 ONLINECAR_SMS_PROVIDER 选择实现
+	// 默认 mock（开发环境），设为 "aliyun" 对接阿里云短信
+	var smsSender sms.SmsSender = sms.NewMockSmsSender()
+	if provider := os.Getenv("ONLINECAR_SMS_PROVIDER"); provider == "aliyun" {
+		smsSender = sms.NewAliyunSmsSender()
+	}
 
 	return &ServiceContext{
 		Config:        c,
@@ -42,7 +79,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		PassengerConn: passengerConn.Conn(),
 		DistrictConn:  districtConn.Conn(),
 		Redis:         redis.MustNewRedis(c.RedisConf),
-		SmsSender:     sms.NewMockSmsSender(),
-		ProvinceCache: cache.NewProvinceCache(districtClient, 0), // 默认 10 分钟刷新
+		SmsSender:     smsSender,
+		ProvinceCache: cache.NewProvinceCache(districtClient, 10*time.Minute),
 	}
 }

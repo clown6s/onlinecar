@@ -32,6 +32,7 @@ func NewProvinceCache(client districtpb.DistrictServiceClient, ttl time.Duration
 }
 
 // Get 获取省份列表，纯内存读取，不走 RPC
+// 注意：忽略 context 参数（纯内存操作无 I/O），保留签名以符合接口约定
 func (c *ProvinceCache) Get(_ context.Context) ([]*types.DistrictNodeResp, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

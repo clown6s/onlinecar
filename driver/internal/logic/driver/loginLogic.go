@@ -2,6 +2,7 @@ package driverlogic
 
 import (
 	"context"
+	"errors"
 	"regexp"
 
 	"onlinecar-common/errorx"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
+
+var loginPhoneRegex = regexp.MustCompile(`^1[3-9]\d{9}$`)
 
 type LoginLogic struct {
 	ctx    context.Context
@@ -31,14 +34,13 @@ func (l *LoginLogic) Login(in *pb.LoginReq) (*pb.LoginResp, error) {
 	l.Infof("司机登录, phone=%s", in.DriverPhone)
 
 	// 手机号格式校验
-	matched, _ := regexp.MatchString(`^1[3-9]\d{9}$`, in.DriverPhone)
-	if !matched {
+	if !loginPhoneRegex.MatchString(in.DriverPhone) {
 		return nil, errorx.ErrPhoneFormat
 	}
 
 	driverUser, err := l.svcCtx.DriverUserModel.FindByPhone(l.ctx, in.DriverPhone)
 	if err != nil {
-		if err == model.ErrNotFound {
+		if errors.Is(err, model.ErrNotFound) {
 			l.Errorf("司机不存在, phone=%s", in.DriverPhone)
 		} else {
 			l.Errorf("查询司机失败, phone=%s, err=%v", in.DriverPhone, err)

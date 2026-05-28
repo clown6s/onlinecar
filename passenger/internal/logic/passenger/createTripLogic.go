@@ -2,6 +2,8 @@ package passengerlogic
 
 import (
 	"context"
+	"errors"
+	"math"
 	"unicode/utf8"
 
 	"onlinecar-common/errorx"
@@ -52,40 +54,33 @@ func (l *CreateTripLogic) CreateTrip(in *pb.CreateTripReq) (*pb.TripResp, error)
 	// 验证乘客是否存在
 	passenger, err := l.svcCtx.PassengerUserModel.FindOne(l.ctx, in.PassengerId)
 	if err != nil {
+		if errors.Is(err, model.ErrNotFound) {
+			return nil, errorx.NewCodeError(errorx.ErrCodeUserNotFound, "乘客不存在")
+		}
 		logx.Errorf("查询乘客失败, passengerId=%d, err=%v", in.PassengerId, err)
 		return nil, errorx.ErrServer
-	}
-	if passenger == nil {
-		return nil, errorx.NewCodeError(errorx.ErrCodeUserNotFound, "乘客不存在")
 	}
 	if passenger.State != nil && *passenger.State == 1 {
 		return nil, errorx.ErrUserDisabled
 	}
 
-	// 验证坐标范围
-	if in.OriginLng < -180 || in.OriginLng > 180 || in.OriginLat < -90 || in.OriginLat > 90 {
+	// 验证坐标范围（含 NaN/Inf 检查，NaN < -180 为 false 可绕过范围校验）
+	if math.IsNaN(in.OriginLng) || math.IsInf(in.OriginLng, 0) || in.OriginLng < -180 || in.OriginLng > 180 ||
+		math.IsNaN(in.OriginLat) || math.IsInf(in.OriginLat, 0) || in.OriginLat < -90 || in.OriginLat > 90 {
 		return nil, errorx.NewCodeError(errorx.ErrCodeParam, "起点坐标无效")
 	}
-	if in.DestLng < -180 || in.DestLng > 180 || in.DestLat < -90 || in.DestLat > 90 {
+	if math.IsNaN(in.DestLng) || math.IsInf(in.DestLng, 0) || in.DestLng < -180 || in.DestLng > 180 ||
+		math.IsNaN(in.DestLat) || math.IsInf(in.DestLat, 0) || in.DestLat < -90 || in.DestLat > 90 {
 		return nil, errorx.NewCodeError(errorx.ErrCodeParam, "终点坐标无效")
 	}
 
-	// 检查是否有未完成的行程（status=0 待接单 或 status=1 进行中）
-	pendingTrips, err := l.svcCtx.TripModel.FindByPassengerIdAndStatus(l.ctx, in.PassengerId, 0, 1, 1)
+	// 检查是否有未完成的行程（status=0 待接单 或 status=1 进行中），一次查询
+	activeTrips, err := l.svcCtx.TripModel.FindActiveTrips(l.ctx, in.PassengerId, []int8{0, 1})
 	if err != nil {
-		logx.Errorf("查询待接单行程失败, passengerId=%d, err=%v", in.PassengerId, err)
+		logx.Errorf("查询未完成行程失败, passengerId=%d, err=%v", in.PassengerId, err)
 		return nil, errorx.ErrServer
 	}
-	if len(pendingTrips) > 0 {
-		return nil, errorx.NewCodeError(errorx.ErrCodeTripStatusInvalid, "您有未完成的行程，请等待完成后再创建新行程")
-	}
-
-	inProgressTrips, err := l.svcCtx.TripModel.FindByPassengerIdAndStatus(l.ctx, in.PassengerId, 1, 1, 1)
-	if err != nil {
-		logx.Errorf("查询进行中行程失败, passengerId=%d, err=%v", in.PassengerId, err)
-		return nil, errorx.ErrServer
-	}
-	if len(inProgressTrips) > 0 {
+	if len(activeTrips) > 0 {
 		return nil, errorx.NewCodeError(errorx.ErrCodeTripStatusInvalid, "您有未完成的行程，请等待完成后再创建新行程")
 	}
 

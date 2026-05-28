@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -104,7 +105,7 @@ func (m *defaultDriverUserModel) FindOne(ctx context.Context, id int64) (*Driver
 	var resp DriverUser
 	err := m.conn.QueryRowCtx(ctx, &resp, query, id)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, err
@@ -117,7 +118,7 @@ func (m *defaultDriverUserModel) FindByPhone(ctx context.Context, phone string) 
 	var resp DriverUser
 	err := m.conn.QueryRowCtx(ctx, &resp, query, phone)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, err
@@ -178,7 +179,7 @@ func (m *defaultDriverUserModel) FindByPhoneWithConn(ctx context.Context, sessio
 	var resp DriverUser
 	err := session.QueryRowCtx(ctx, &resp, query, phone)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, err
@@ -298,7 +299,7 @@ func (m *defaultDriverUserModel) FindDriverDetail(ctx context.Context, driverId 
 	var row driverDetailRow
 	err := m.conn.QueryRowCtx(ctx, &row, query, driverId)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil, nil, ErrNotFound
 		}
 		return nil, nil, nil, err

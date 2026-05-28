@@ -16,6 +16,9 @@ var (
 		"id", "gmt_create", "gmt_modified", "passenger_phone",
 		"passenger_name", "passenger_gender", "state", "profile_photo",
 	}
+
+	// ErrNotFound 记录不存在（与 driver 模块保持一致的错误处理模式）
+	ErrNotFound = errors.New("record not found")
 )
 
 type (
@@ -74,7 +77,7 @@ func (m *defaultPassengerUserModel) FindOne(ctx context.Context, id int64) (*Pas
 	err := m.conn.QueryRowCtx(ctx, &resp, query, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+			return nil, ErrNotFound
 		}
 		return nil, err
 	}
@@ -87,7 +90,7 @@ func (m *defaultPassengerUserModel) FindByPhone(ctx context.Context, phone strin
 	err := m.conn.QueryRowCtx(ctx, &resp, query, phone)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+			return nil, ErrNotFound
 		}
 		return nil, err
 	}
@@ -138,7 +141,7 @@ func (m *defaultPassengerUserModel) FindByPhoneWithConn(ctx context.Context, ses
 	err := session.QueryRowCtx(ctx, &resp, query, phone)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+			return nil, ErrNotFound
 		}
 		return nil, err
 	}

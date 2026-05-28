@@ -7,10 +7,10 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"syscall"
 	"time"
 
+	"onlinecar-common/errorx"
 	"onlinecar-passenger/internal/config"
 	passengerserver "onlinecar-passenger/internal/server/passenger"
 	"onlinecar-passenger/internal/svc"
@@ -22,7 +22,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/keepalive"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -60,7 +59,7 @@ func main() {
 			MinTime:             10 * time.Second,
 			PermitWithoutStream: false,
 		}),
-		// UnaryInterceptor：统一日志、panic recovery、内部认证
+		// UnaryInterceptor：统一日志、panic recovery
 		grpc.UnaryInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 			startTime := time.Now()
 			defer func() {
@@ -70,27 +69,14 @@ func main() {
 				}
 			}()
 
-			// 内部认证：校验 x-internal-token
-			if !strings.HasPrefix(info.FullMethod, "/grpc.health.v1.Health/") {
-				internalToken := os.Getenv("ONLINECAR_INTERNAL_TOKEN")
-				if internalToken == "" {
-					logx.Severef("[gRPC] ONLINECAR_INTERNAL_TOKEN 未设置，拒绝所有非健康检查请求")
-					return nil, status.Errorf(codes.Unauthenticated, "internal token not configured")
-				}
-				md, ok := metadata.FromIncomingContext(ctx)
-				if !ok {
-					return nil, status.Errorf(codes.Unauthenticated, "missing metadata")
-				}
-				tokens := md.Get("x-internal-token")
-				if len(tokens) == 0 || tokens[0] != internalToken {
-					return nil, status.Errorf(codes.Unauthenticated, "invalid internal token")
-				}
-			}
-
 			resp, err = handler(ctx, req)
 			duration := time.Since(startTime)
 
 			if err != nil {
+				// 将业务错误码写入 gRPC trailer，供 Gateway MapRpcError 提取
+				if bizCode := errorx.ErrorToBizCode(err); bizCode > 0 {
+					errorx.SetGrpcBizCode(ctx, bizCode)
+				}
 				code := status.Code(err)
 				logx.Errorf("[gRPC] %s 耗时=%v code=%s err=%v",
 					info.FullMethod, duration, code.String(), err)
@@ -101,7 +87,7 @@ func main() {
 
 			return resp, err
 		}),
-		// StreamInterceptor：panic recovery、内部认证
+		// StreamInterceptor：panic recovery
 		grpc.StreamInterceptor(func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
 			defer func() {
 				if r := recover(); r != nil {
@@ -109,23 +95,6 @@ func main() {
 					err = status.Errorf(codes.Internal, "internal server error")
 				}
 			}()
-
-			// 内部认证：校验 x-internal-token
-			if !strings.HasPrefix(info.FullMethod, "/grpc.health.v1.Health/") {
-				internalToken := os.Getenv("ONLINECAR_INTERNAL_TOKEN")
-				if internalToken == "" {
-					logx.Severef("[gRPC] ONLINECAR_INTERNAL_TOKEN 未设置，拒绝所有非健康检查请求")
-					return status.Errorf(codes.Unauthenticated, "internal token not configured")
-				}
-				md, ok := metadata.FromIncomingContext(ss.Context())
-				if !ok {
-					return status.Errorf(codes.Unauthenticated, "missing metadata")
-				}
-				tokens := md.Get("x-internal-token")
-				if len(tokens) == 0 || tokens[0] != internalToken {
-					return status.Errorf(codes.Unauthenticated, "invalid internal token")
-				}
-			}
 
 			return handler(srv, ss)
 		}),

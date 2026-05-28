@@ -32,10 +32,13 @@ type RateLimitMiddleware struct {
 	limiters        map[string]*ipLimiter
 	cleanupInterval time.Duration
 	maxIdle         time.Duration // IP 无请求多久后清理
+	maxEntries      int           // map 最大条目数（防止 DDoS 下 OOM）
 	trustedSubnets  []*net.IPNet  // 可信代理网段
 	ctx             context.Context
 	cancel          context.CancelFunc
 }
+
+const defaultMaxEntries = 100000 // 10 万 IP 上限
 
 func NewRateLimitMiddleware(r int, trustedSubnets ...string) *RateLimitMiddleware {
 	if r <= 0 {
@@ -49,6 +52,7 @@ func NewRateLimitMiddleware(r int, trustedSubnets ...string) *RateLimitMiddlewar
 		limiters:        make(map[string]*ipLimiter),
 		cleanupInterval: 5 * time.Minute,
 		maxIdle:         10 * time.Minute,
+		maxEntries:      defaultMaxEntries,
 		ctx:             ctx,
 		cancel:          cancel,
 	}
@@ -94,6 +98,11 @@ func (m *RateLimitMiddleware) isTrustedProxy(remoteAddr string) bool {
 func (m *RateLimitMiddleware) getLimiter(ip string) *ipLimiter {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	// 防止 DDoS 下 map 无限增长
+	if len(m.limiters) >= m.maxEntries {
+		return nil
+	}
 
 	limiter, ok := m.limiters[ip]
 	if !ok {
@@ -209,12 +218,12 @@ func (m *RateLimitMiddleware) Handle(next http.HandlerFunc) http.HandlerFunc {
 		ip := GetClientIP(r, m.trustedSubnets...)
 		limiter := m.getLimiter(ip)
 
-		if limiter.limiter.Allow() {
-			next(w, r)
-		} else {
+		if limiter == nil || !limiter.limiter.Allow() {
 			logx.Infof("[RATELIMIT] 请求被限流, method=%s, path=%s, ip=%s",
 				r.Method, r.URL.Path, ip)
 			response.Error(w, http.StatusTooManyRequests, 429, "请求过于频繁，请稍后再试")
+			return
 		}
+		next(w, r)
 	}
 }

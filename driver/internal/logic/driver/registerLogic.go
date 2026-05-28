@@ -16,6 +16,8 @@ import (
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
+var phoneRegex = regexp.MustCompile(`^1[3-9]\d{9}$`)
+
 type RegisterLogic struct {
 	ctx    context.Context
 	svcCtx *svc.ServiceContext
@@ -35,8 +37,7 @@ func (l *RegisterLogic) Register(in *pb.RegisterReq) (*pb.RegisterResp, error) {
 	l.Infof("司机注册, phone=%s, name=%s", in.DriverPhone, in.DriverName)
 
 	// 手机号格式校验
-	matched, _ := regexp.MatchString(`^1[3-9]\d{9}$`, in.DriverPhone)
-	if !matched {
+	if !phoneRegex.MatchString(in.DriverPhone) {
 		return nil, errorx.ErrPhoneFormat
 	}
 
@@ -78,8 +79,16 @@ func (l *RegisterLogic) Register(in *pb.RegisterReq) (*pb.RegisterResp, error) {
 		}
 		driverId = id
 
-		// 3. 如果有车辆信息，插入车辆并绑定
+		// 2. 如果有车辆信息，先检查车辆是否已被其他司机绑定
 		if in.VehicleNo != "" {
+			existingCar, err := l.svcCtx.CarModel.FindByVehicleNoWithConn(ctx, session, in.VehicleNo)
+			if err != nil {
+				return fmt.Errorf("查询车辆失败: %w", err)
+			}
+			if existingCar != nil {
+				return errorx.ErrVehicleBound
+			}
+
 			var vehicleType string
 			if in.VehicleType != "" {
 				vehicleType = in.VehicleType
@@ -99,7 +108,7 @@ func (l *RegisterLogic) Register(in *pb.RegisterReq) (*pb.RegisterResp, error) {
 				return fmt.Errorf("获取车辆ID失败: %w", err)
 			}
 
-			// 4. 插入绑定关系
+			// 3. 插入绑定关系
 			bindState := 1
 			now := time.Now()
 			binding := &model.DriverCarBinding{

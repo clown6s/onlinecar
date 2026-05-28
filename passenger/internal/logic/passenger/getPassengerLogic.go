@@ -2,8 +2,10 @@ package passengerlogic
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
+	"onlinecar-common/errorx"
+	"onlinecar-passenger/internal/model"
 	"onlinecar-passenger/internal/svc"
 	"onlinecar-passenger/pb"
 
@@ -30,11 +32,11 @@ func (l *GetPassengerLogic) GetPassenger(in *pb.GetPassengerReq) (*pb.PassengerI
 
 	passengerUser, err := l.svcCtx.PassengerUserModel.FindOne(l.ctx, in.Id)
 	if err != nil {
+		if errors.Is(err, model.ErrNotFound) {
+			return nil, errorx.ErrUserNotFound
+		}
 		l.Errorf("查询乘客失败, passengerId=%d, err=%v", in.Id, err)
-		return nil, fmt.Errorf("查询失败，请稍后重试")
-	}
-	if passengerUser == nil {
-		return nil, fmt.Errorf("乘客不存在")
+		return nil, errorx.ErrServer
 	}
 
 	info := &pb.PassengerInfo{

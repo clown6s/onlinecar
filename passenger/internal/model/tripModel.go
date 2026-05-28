@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
@@ -26,6 +27,7 @@ type (
 		FindOne(ctx context.Context, id int64) (*Trip, error)
 		FindByPassengerId(ctx context.Context, passengerId int64, page, pageSize int) ([]*Trip, error)
 		FindByPassengerIdAndStatus(ctx context.Context, passengerId int64, status int8, page, pageSize int) ([]*Trip, error)
+		FindActiveTrips(ctx context.Context, passengerId int64, statuses []int8) ([]*Trip, error)
 		Update(ctx context.Context, data *Trip) error
 	}
 
@@ -141,6 +143,34 @@ func (m *defaultTripModel) FindByPassengerIdAndStatus(ctx context.Context, passe
 		return nil, err
 	}
 	return resp, nil
+}
+
+// FindActiveTrips 查询乘客指定状态列表中的未完成行程（用于创建行程前的冲突检查）
+func (m *defaultTripModel) FindActiveTrips(ctx context.Context, passengerId int64, statuses []int8) ([]*Trip, error) {
+	if len(statuses) == 0 {
+		return nil, nil
+	}
+
+	// 构建 IN (?, ?, ...) 占位符
+	placeholders := make([]string, len(statuses))
+	args := make([]interface{}, 0, len(statuses)+1)
+	args = append(args, passengerId)
+	for i, s := range statuses {
+		placeholders[i] = "?"
+		args = append(args, s)
+	}
+
+	query := fmt.Sprintf("SELECT %s FROM %s WHERE `passenger_id` = ? AND `status` IN (%s) ORDER BY `id` DESC LIMIT 1",
+		strings.Join(tripFieldNames, ","), m.table, strings.Join(placeholders, ","))
+
+	logx.Debugf("FindActiveTrips query: %s, args: %v", query, args)
+
+	var trips []*Trip
+	err := m.conn.QueryRowsCtx(ctx, &trips, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	return trips, nil
 }
 
 func (m *defaultTripModel) Update(ctx context.Context, data *Trip) error {
