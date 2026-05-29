@@ -4,11 +4,19 @@ FROM golang:1.26.1-alpine AS builder
 RUN apk add --no-cache git ca-certificates tzdata
 
 WORKDIR /app
-COPY go.mod go.sum ./
+
+# 先复制 common 模块（go.mod 中 replace onlinecar-common => ../common）
+COPY common/go.mod common/go.sum /common/
+
+# 复制服务依赖文件并下载
+COPY passenger/go.mod passenger/go.sum ./
 ENV GOPROXY=https://goproxy.cn,direct
 RUN go mod download
 
-COPY . .
+# 复制源代码
+COPY common/ /common/
+COPY passenger/ .
+
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /passenger .
 
 # ========== 运行阶段 ==========

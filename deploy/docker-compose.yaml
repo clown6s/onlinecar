@@ -546,8 +546,8 @@ services:
   # ========== 业务服务 ==========
   driver:
     build:
-      context: ../driver
-      dockerfile: ../deploy/driver/Dockerfile
+      context: ..
+      dockerfile: deploy/driver/Dockerfile
     # gRPC 端口仅容器内互通，不暴露
     # ports:
     #   - "6000:6000"
@@ -602,8 +602,8 @@ services:
 
   passenger:
     build:
-      context: ../passenger
-      dockerfile: ../deploy/passenger/Dockerfile
+      context: ..
+      dockerfile: deploy/passenger/Dockerfile
     # gRPC 端口仅容器内互通，不暴露
     # ports:
     #   - "6001:6001"
@@ -658,8 +658,8 @@ services:
 
   district:
     build:
-      context: ../district
-      dockerfile: ../deploy/district/Dockerfile
+      context: ..
+      dockerfile: deploy/district/Dockerfile
     # gRPC 端口仅容器内互通，不暴露
     # ports:
     #   - "6002:6002"
@@ -714,8 +714,8 @@ services:
 
   gateway:
     build:
-      context: ../gateway
-      dockerfile: ../deploy/gateway/Dockerfile
+      context: ..
+      dockerfile: deploy/gateway/Dockerfile
     # Gateway 仅容器内网络访问，通过 Nginx 反向代理对外暴露
     # ports:
     #   - "7000:7000"
