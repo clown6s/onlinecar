@@ -261,7 +261,7 @@ services:
     security_opt:
       - no-new-privileges:true
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O/dev/null http://localhost:9080/ready || exit 1"]
+      test: ["CMD-SHELL", "wget -q http://localhost:9080/ready -O /dev/null"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -428,12 +428,8 @@ services:
         condition: service_started
     networks:
       - onlinecar
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O/dev/null http://localhost:13133/ || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-    security_opt:
+    # OTEL Collector 镜像基于 distroless，无 shell，无法执行 healthcheck
+    networks:
       - no-new-privileges:true
     deploy:
       resources:
@@ -667,7 +663,7 @@ services:
     networks:
       - onlinecar
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/healthz"]
+      test: ["CMD-SHELL", "wget -q http://localhost:80/healthz -O /dev/null"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -730,7 +726,7 @@ services:
     networks:
       - onlinecar
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O/dev/null http://localhost:9121/metrics || exit 1"]
+      test: ["CMD-SHELL", "wget -q http://localhost:9121/metrics -O /dev/null"]
       interval: 15s
       timeout: 5s
       retries: 3
