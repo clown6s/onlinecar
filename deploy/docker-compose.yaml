@@ -501,7 +501,7 @@ services:
   # 密码通过环境变量注入，脚本具备幂等性（重复执行不会失败）
   # 依赖 etcd service_started，脚本内自行重试等待 etcd 就绪
   etcd-setup:
-    image: bitnami/etcd:3.6.9
+    image: alpine:3.19
     depends_on:
       etcd-1:
         condition: service_started
