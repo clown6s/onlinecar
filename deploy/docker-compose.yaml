@@ -4,6 +4,8 @@ services:
   # ========== 基础设施 ==========
 
   # etcd 3 节点集群（认证由 etcd-setup 初始化）
+  # 注意：etcd 镜像基于 distroless，无 shell/nc/curl，不设 healthcheck
+  # etcd 就绪由 etcd-setup 脚本自行检测（带重试）
   etcd-1:
     image: quay.io/coreos/etcd:v3.6.9
     restart: unless-stopped
@@ -23,12 +25,6 @@ services:
       - etcd1_data:/etcd-data
     networks:
       - onlinecar
-    healthcheck:
-      test: ["CMD-SHELL", "nc -z localhost 2379"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
     security_opt:
       - no-new-privileges:true
     deploy:
@@ -56,16 +52,11 @@ services:
       ETCD_ADVERTISE_CLIENT_URLS: http://etcd-2:2379
       ETCD_INITIAL_CLUSTER: etcd1=http://etcd-1:2380,etcd2=http://etcd-2:2380,etcd3=http://etcd-3:2380
       ETCD_CLUSTER_STATE: new
+      TZ: Asia/Shanghai
     volumes:
       - etcd2_data:/etcd-data
     networks:
       - onlinecar
-    healthcheck:
-      test: ["CMD-SHELL", "nc -z localhost 2379"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
     security_opt:
       - no-new-privileges:true
     deploy:
@@ -93,16 +84,11 @@ services:
       ETCD_ADVERTISE_CLIENT_URLS: http://etcd-3:2379
       ETCD_INITIAL_CLUSTER: etcd1=http://etcd-1:2380,etcd2=http://etcd-2:2380,etcd3=http://etcd-3:2380
       ETCD_CLUSTER_STATE: new
+      TZ: Asia/Shanghai
     volumes:
       - etcd3_data:/etcd-data
     networks:
       - onlinecar
-    healthcheck:
-      test: ["CMD-SHELL", "nc -z localhost 2379"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
     security_opt:
       - no-new-privileges:true
     deploy:
@@ -209,6 +195,7 @@ services:
         max-file: "3"
 
   # Jaeger 链路追踪 v2
+  # 镜像基于 distroless，无 wget/curl，健康检查用 /proc
   jaeger:
     image: jaegertracing/jaeger:2.3.0
     container_name: onlinecar-jaeger
@@ -399,11 +386,11 @@ services:
       redis-exporter:
         condition: service_healthy
       etcd-1:
-        condition: service_healthy
+        condition: service_started
       etcd-2:
-        condition: service_healthy
+        condition: service_started
       etcd-3:
-        condition: service_healthy
+        condition: service_started
       loki:
         condition: service_healthy
     networks:
@@ -517,15 +504,16 @@ services:
 
   # etcd 认证初始化（一次性任务，创建用户并启用认证）
   # 密码通过环境变量注入，脚本具备幂等性（重复执行不会失败）
+  # 依赖 etcd service_started，脚本内自行重试等待 etcd 就绪
   etcd-setup:
     image: quay.io/coreos/etcd:v3.6.9
     depends_on:
       etcd-1:
-        condition: service_healthy
+        condition: service_started
       etcd-2:
-        condition: service_healthy
+        condition: service_started
       etcd-3:
-        condition: service_healthy
+        condition: service_started
     environment:
       ETCD_ROOT_PASSWORD: "OnlineCar@2026#Etcd"
       ETCD_APP_PASSWORD: "OnlineCar@2026#EtcdApp"
@@ -534,7 +522,7 @@ services:
       - onlinecar
     volumes:
       - ./scripts/etcd-setup.sh:/etcd-setup.sh:ro
-    entrypoint: ["sh", "/etcd-setup.sh"]
+    entrypoint: ["sh", "-c", "sleep 5 && /etcd-setup.sh"]
     logging:
       driver: json-file
       options:
