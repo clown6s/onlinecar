@@ -24,7 +24,7 @@ services:
     networks:
       - onlinecar
     healthcheck:
-      test: ["CMD-SHELL", "etcdctl endpoint health -w json http://localhost:2379 2>/dev/null | grep -q '\"health\": true' || exit 0"]
+      test: ["CMD-SHELL", "nc -z localhost 2379"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -61,7 +61,7 @@ services:
     networks:
       - onlinecar
     healthcheck:
-      test: ["CMD-SHELL", "etcdctl endpoint health -w json http://localhost:2379 2>/dev/null | grep -q '\"health\": true' || exit 0"]
+      test: ["CMD-SHELL", "nc -z localhost 2379"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -98,7 +98,7 @@ services:
     networks:
       - onlinecar
     healthcheck:
-      test: ["CMD-SHELL", "etcdctl endpoint health -w json http://localhost:2379 2>/dev/null | grep -q '\"health\": true' || exit 0"]
+      test: ["CMD-SHELL", "nc -z localhost 2379"]
       interval: 10s
       timeout: 5s
       retries: 5
