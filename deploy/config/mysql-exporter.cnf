@@ -1,0 +1,5 @@
+[client]
+host = mysql
+port = 3306
+user = onlinecar_app
+password = "OnlineCar@2026#App"

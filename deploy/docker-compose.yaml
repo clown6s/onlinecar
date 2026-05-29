@@ -695,11 +695,12 @@ services:
     image: prom/mysqld-exporter:v0.15.1
     restart: unless-stopped
     environment:
-      DATA_SOURCE_NAME: "onlinecar_app:OnlineCar%402026%23App@tcp(mysql:3306)/online_car"
       TZ: Asia/Shanghai
     depends_on:
       mysql:
         condition: service_healthy
+    volumes:
+      - ./config/mysql-exporter.cnf:/.my.cnf:ro
     networks:
       - onlinecar
     security_opt:
