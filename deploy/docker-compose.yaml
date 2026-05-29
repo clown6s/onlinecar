@@ -260,11 +260,6 @@ services:
       - onlinecar
     security_opt:
       - no-new-privileges:true
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q http://localhost:9080/ready -O /dev/null"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
     deploy:
       resources:
         limits:
@@ -662,12 +657,6 @@ services:
         condition: service_started
     networks:
       - onlinecar
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q http://localhost:80/healthz -O /dev/null"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
     security_opt:
       - no-new-privileges:true
     deploy:
@@ -725,11 +714,6 @@ services:
         condition: service_healthy
     networks:
       - onlinecar
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q http://localhost:9121/metrics -O /dev/null"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
     security_opt:
       - no-new-privileges:true
     deploy:
