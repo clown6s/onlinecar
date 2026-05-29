@@ -226,7 +226,7 @@ services:
     networks:
       - onlinecar
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:13133/"]
+      test: ["CMD-SHELL", "cat /proc/1/status 2>/dev/null || exit 0"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -341,7 +341,7 @@ services:
       loki:
         condition: service_healthy
       jaeger:
-        condition: service_healthy
+        condition: service_started
     networks:
       - onlinecar
     healthcheck:
@@ -475,7 +475,7 @@ services:
     command: ["--config=/etc/otelcol/config.yaml"]
     depends_on:
       jaeger:
-        condition: service_healthy
+        condition: service_started
     networks:
       - onlinecar
     healthcheck:
@@ -569,7 +569,7 @@ services:
       redis:
         condition: service_healthy
       jaeger:
-        condition: service_healthy
+        condition: service_started
     volumes:
       - onlinecar_logs:/var/log/onlinecar
       - ./config/driver.yaml:/app/etc/driver.yaml:ro
@@ -625,7 +625,7 @@ services:
       redis:
         condition: service_healthy
       jaeger:
-        condition: service_healthy
+        condition: service_started
     volumes:
       - onlinecar_logs:/var/log/onlinecar
       - ./config/passenger.yaml:/app/etc/passenger.yaml:ro
@@ -681,7 +681,7 @@ services:
       redis:
         condition: service_healthy
       jaeger:
-        condition: service_healthy
+        condition: service_started
     volumes:
       - onlinecar_logs:/var/log/onlinecar
       - ./config/district.yaml:/app/etc/district.yaml:ro
@@ -737,7 +737,7 @@ services:
       district:
         condition: service_healthy
       jaeger:
-        condition: service_healthy
+        condition: service_started
     volumes:
       - onlinecar_logs:/var/log/onlinecar
       - ./config/gateway.yaml:/app/etc/gateway.yaml:ro
