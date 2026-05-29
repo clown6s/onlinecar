@@ -3,9 +3,7 @@ name: onlinecar
 services:
   # ========== 基础设施 ==========
 
-  # etcd 3 节点集群（认证由 etcd-setup 初始化）
-  # 注意：etcd 镜像基于 distroless，无 shell/nc/curl，不设 healthcheck
-  # etcd 就绪由 etcd-setup 脚本自行检测（带重试）
+  # etcd 3 节点集群（开发测试环境，无认证）
   etcd-1:
     image: quay.io/coreos/etcd:v3.6.9
     restart: unless-stopped
@@ -390,12 +388,7 @@ services:
         condition: service_healthy
     networks:
       - onlinecar
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
+    # prom/prometheus v3 基于 scratch，无 wget/shell，不设 healthcheck
     security_opt:
       - no-new-privileges:true
     deploy:
@@ -429,11 +422,7 @@ services:
       TZ: Asia/Shanghai
     networks:
       - onlinecar
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9093/-/healthy"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
+    # prom/alertmanager 基于 scratch，无 wget/shell，不设 healthcheck
     security_opt:
       - no-new-privileges:true
     deploy:
@@ -497,33 +486,6 @@ services:
         max-size: "10m"
         max-file: "1"
 
-  # etcd 认证初始化（一次性任务，创建用户并启用认证）
-  # 密码通过环境变量注入，脚本具备幂等性（重复执行不会失败）
-  # 依赖 etcd service_started，脚本内自行重试等待 etcd 就绪
-  etcd-setup:
-    image: alpine:3.19
-    depends_on:
-      etcd-1:
-        condition: service_started
-      etcd-2:
-        condition: service_started
-      etcd-3:
-        condition: service_started
-    environment:
-      ETCD_ROOT_PASSWORD: "OnlineCar@2026#Etcd"
-      ETCD_APP_PASSWORD: "OnlineCar@2026#EtcdApp"
-      TZ: Asia/Shanghai
-    networks:
-      - onlinecar
-    volumes:
-      - ./scripts/etcd-setup.sh:/etcd-setup.sh:ro
-    entrypoint: ["sh", "-c", "sleep 5 && /etcd-setup.sh"]
-    logging:
-      driver: json-file
-      options:
-        max-size: "20m"
-        max-file: "2"
-
   # ========== 业务服务 ==========
   driver:
     build:
@@ -544,8 +506,6 @@ services:
       REDIS_PASSWORD: "OnlineCar@2026#Redis"
     depends_on:
       log-init:
-        condition: service_completed_successfully
-      etcd-setup:
         condition: service_completed_successfully
       mysql:
         condition: service_healthy
@@ -601,8 +561,6 @@ services:
     depends_on:
       log-init:
         condition: service_completed_successfully
-      etcd-setup:
-        condition: service_completed_successfully
       mysql:
         condition: service_healthy
       redis:
@@ -657,8 +615,6 @@ services:
     depends_on:
       log-init:
         condition: service_completed_successfully
-      etcd-setup:
-        condition: service_completed_successfully
       mysql:
         condition: service_healthy
       redis:
@@ -710,8 +666,6 @@ services:
       ONLINECAR_PASSENGER_JWT_SECRET: "oc-pax-7e1b9c4f2a8d5678prod2026"
     depends_on:
       log-init:
-        condition: service_completed_successfully
-      etcd-setup:
         condition: service_completed_successfully
       driver:
         condition: service_healthy
