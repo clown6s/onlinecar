@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: onlinecar
+  labels:
+    app: gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      containers:
+        - name: gateway
+          image: onlinecar/gateway:latest
+          ports:
+            - containerPort: 7000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: onlinecar-env
+            - secretRef:
+                name: onlinecar-secrets
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "gateway-api"
+            - name: ONLINECAR_DRIVER_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: onlinecar-secrets
+                  key: driver-jwt-secret
+            - name: ONLINECAR_PASSENGER_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: onlinecar-secrets
+                  key: passenger-jwt-secret
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: onlinecar
+spec:
+  selector:
+    app: gateway
+  ports:
+    - port: 80
+      targetPort: http
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: gateway-hpa
+  namespace: onlinecar
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: gateway
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

@@ -44,24 +44,26 @@ func cacheTTL() time.Duration {
 	return districtCacheBaseTTL + jitter - time.Hour       // 23~25h
 }
 
-// 获取省级行政区列表（带 Redis 缓存）
+// 获取省级行政区列表（带 Redis 缓存，Redis 不可用时降级为直查 DB）
 func (l *GetProvincesLogic) GetProvinces(in *pb.GetProvincesReq) (*pb.GetProvincesResp, error) {
 	l.Info("获取省级行政区列表")
 
 	cacheKey := fmt.Sprintf("%s%s", districtCachePrefix, "province")
 
-	// 1. 尝试读缓存
-	cached, err := l.svcCtx.Redis.Get(cacheKey)
-	if err != nil && err != redis.Nil {
-		l.Errorf("Redis 读取失败, key=%s, err=%v", cacheKey, err)
-	}
-	if err == nil && cached != "" {
-		var resp pb.GetProvincesResp
-		if err = json.Unmarshal([]byte(cached), &resp); err == nil {
-			l.Infof("命中缓存, key=%s, count=%d", cacheKey, len(resp.List))
-			return &resp, nil
+	// 1. 尝试读缓存（Redis 可用时）
+	if l.svcCtx.Redis != nil {
+		cached, err := l.svcCtx.Redis.Get(cacheKey)
+		if err != nil && err != redis.Nil {
+			l.Errorf("Redis 读取失败, key=%s, err=%v", cacheKey, err)
 		}
-		l.Errorf("缓存反序列化失败, key=%s, err=%v", cacheKey, err)
+		if err == nil && cached != "" {
+			var resp pb.GetProvincesResp
+			if err = json.Unmarshal([]byte(cached), &resp); err == nil {
+				l.Infof("命中缓存, key=%s, count=%d", cacheKey, len(resp.List))
+				return &resp, nil
+			}
+			l.Errorf("缓存反序列化失败, key=%s, err=%v", cacheKey, err)
+		}
 	}
 
 	// 2. 缓存未命中，使用 singleflight 防止击穿
@@ -73,11 +75,13 @@ func (l *GetProvincesLogic) GetProvinces(in *pb.GetProvincesReq) (*pb.GetProvinc
 		default:
 		}
 
-		// double check：再次读缓存，可能其他 goroutine 已填充
-		if cached, err := l.svcCtx.Redis.Get(cacheKey); err == nil && cached != "" {
-			var resp pb.GetProvincesResp
-			if jsonErr := json.Unmarshal([]byte(cached), &resp); jsonErr == nil {
-				return &resp, nil
+		// double check：再次读缓存（Redis 可用时）
+		if l.svcCtx.Redis != nil {
+			if cached, err := l.svcCtx.Redis.Get(cacheKey); err == nil && cached != "" {
+				var resp pb.GetProvincesResp
+				if jsonErr := json.Unmarshal([]byte(cached), &resp); jsonErr == nil {
+					return &resp, nil
+				}
 			}
 		}
 
@@ -102,10 +106,12 @@ func (l *GetProvincesLogic) GetProvinces(in *pb.GetProvincesReq) (*pb.GetProvinc
 			resp.List = append(resp.List, node)
 		}
 
-		// 写入缓存（失败不影响响应）
-		if data, marshalErr := json.Marshal(resp); marshalErr == nil {
-			if setErr := l.svcCtx.Redis.Setex(cacheKey, string(data), int(cacheTTL().Seconds())); setErr != nil {
-				l.Errorf("写入缓存失败, key=%s, err=%v", cacheKey, setErr)
+		// 写入缓存（失败不影响响应，Redis 不可用时跳过）
+		if l.svcCtx.Redis != nil {
+			if data, marshalErr := json.Marshal(resp); marshalErr == nil {
+				if setErr := l.svcCtx.Redis.Setex(cacheKey, string(data), int(cacheTTL().Seconds())); setErr != nil {
+					l.Errorf("写入缓存失败, key=%s, err=%v", cacheKey, setErr)
+				}
 			}
 		}
 

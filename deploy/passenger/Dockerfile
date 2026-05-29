@@ -29,4 +29,6 @@ COPY --from=builder --chown=appuser:appgroup /passenger /passenger
 COPY --from=builder --chown=appuser:appgroup /app/etc/passenger.yaml ./etc/passenger.yaml
 
 EXPOSE 6001
+HEALTHCHECK --interval=10s --timeout=5s --retries=3 --start-period=15s \
+  CMD nc -z localhost 6001 || exit 1
 CMD ["/passenger", "-f", "etc/passenger.yaml"]

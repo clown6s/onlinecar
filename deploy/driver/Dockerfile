@@ -29,4 +29,6 @@ COPY --from=builder --chown=appuser:appgroup /driver /driver
 COPY --from=builder --chown=appuser:appgroup /app/etc/driver.yaml ./etc/driver.yaml
 
 EXPOSE 6000
+HEALTHCHECK --interval=10s --timeout=5s --retries=3 --start-period=15s \
+  CMD nc -z localhost 6000 || exit 1
 CMD ["/driver", "-f", "etc/driver.yaml"]

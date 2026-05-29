@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"unicode/utf8"
 
 	"onlinecar-common/errorx"
+	"onlinecar-common/util"
 	"onlinecar-common/validate"
 	"onlinecar-passenger/internal/model"
 	"onlinecar-passenger/internal/svc"
@@ -32,7 +34,7 @@ func NewRegisterLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Register
 
 // 注册乘客（事务：检查手机号 + 插入乘客）
 func (l *RegisterLogic) Register(in *pb.RegisterReq) (*pb.RegisterResp, error) {
-	l.Infof("乘客注册, phone=%s, name=%s", in.PassengerPhone, in.PassengerName)
+	l.Infof("乘客注册, phone=%s, name=%s", util.MaskPhone(in.PassengerPhone), in.PassengerName)
 
 	// 输入校验
 	if !validate.IsValidPhone(in.PassengerPhone) {
@@ -82,6 +84,10 @@ func (l *RegisterLogic) Register(in *pb.RegisterReq) (*pb.RegisterResp, error) {
 		var codeErr *errorx.CodeError
 		if errors.As(err, &codeErr) {
 			return nil, codeErr
+		}
+		// MySQL Duplicate key (error 1062) 映射为手机号已注册
+		if strings.Contains(err.Error(), "Error 1062") || strings.Contains(err.Error(), "Duplicate entry") {
+			return nil, errorx.ErrPhoneRegistered
 		}
 		logx.Errorf("乘客注册事务失败, phone=%s, err=%v", in.PassengerPhone, err)
 		return nil, errorx.ErrServer

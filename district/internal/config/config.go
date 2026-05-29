@@ -7,6 +7,10 @@ import (
 
 type Config struct {
 	zrpc.RpcServerConf
-	DataSource string
-	RedisConf  redis.RedisConf
+	DataSource      string
+	MaxOpenConns    int `json:",default=100"`
+	MaxIdleConns    int `json:",default=20"`
+	ConnMaxLifetime int `json:",default=300"` // 秒
+	RedisConf       redis.RedisConf
+	MetricsPort     int `json:",default=9102"`
 }

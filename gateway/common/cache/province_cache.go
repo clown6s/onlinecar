@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"onlinecar-gateway/internal/types"
@@ -14,12 +15,14 @@ import (
 // ProvinceCache 省级行政区本地内存缓存
 // 采用异步刷新：后台 goroutine 定期拉取，请求路径只做 RLock 读，零阻塞
 type ProvinceCache struct {
-	client    districtpb.DistrictServiceClient
-	data      []*types.DistrictNodeResp
-	mu        sync.RWMutex
-	ttl       time.Duration
-	startOnce sync.Once
-	cancel    context.CancelFunc
+	client     districtpb.DistrictServiceClient
+	data       []*types.DistrictNodeResp
+	mu         sync.RWMutex
+	ttl        time.Duration
+	startOnce  sync.Once
+	cancel     context.CancelFunc
+	failCount  atomic.Int32 // 连续加载失败次数（使用 atomic 保证并发安全）
+	maxFailLog int          // 连续失败超过此数时打印 WARN
 }
 
 func NewProvinceCache(client districtpb.DistrictServiceClient, ttl time.Duration) *ProvinceCache {
@@ -27,22 +30,35 @@ func NewProvinceCache(client districtpb.DistrictServiceClient, ttl time.Duration
 		ttl = 10 * time.Minute
 	}
 	return &ProvinceCache{
-		client: client,
-		ttl:    ttl,
+		client:     client,
+		ttl:        ttl,
+		maxFailLog: 3,
 	}
 }
 
-// Get 获取省份列表，纯内存读取，不走 RPC
-// 注意：忽略 context 参数（纯内存操作无 I/O），保留签名以符合接口约定
-func (c *ProvinceCache) Get(_ context.Context) ([]*types.DistrictNodeResp, error) {
+// Get 获取省份列表，纯内存读取。
+// 当内存缓存为空时（启动加载失败），fallback 到 RPC 直接查询。
+func (c *ProvinceCache) Get(ctx context.Context) ([]*types.DistrictNodeResp, error) {
+	c.mu.RLock()
+	if c.data != nil {
+		result := make([]*types.DistrictNodeResp, len(c.data))
+		copy(result, c.data)
+		c.mu.RUnlock()
+		return result, nil
+	}
+	c.mu.RUnlock()
+
+	// 内存缓存为空，fallback 到 RPC 查询
+	c.load(ctx)
+
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	if c.data == nil {
-		return []*types.DistrictNodeResp{}, nil
+	if c.data != nil {
+		result := make([]*types.DistrictNodeResp, len(c.data))
+		copy(result, c.data)
+		return result, nil
 	}
-	result := make([]*types.DistrictNodeResp, len(c.data))
-	copy(result, c.data)
-	return result, nil
+	return []*types.DistrictNodeResp{}, nil
 }
 
 // Start 启动后台异步刷新 goroutine（使用 sync.Once 保证只执行一次）
@@ -79,7 +95,13 @@ func (c *ProvinceCache) Stop() {
 func (c *ProvinceCache) load(ctx context.Context) {
 	resp, err := c.client.GetProvinces(ctx, &districtpb.GetProvincesReq{})
 	if err != nil {
-		logx.Errorf("ProvinceCache 刷新失败, err=%v", err)
+		count := c.failCount.Add(1)
+		if count >= int32(c.maxFailLog) {
+			logx.Severef("ProvinceCache 连续 %d 次刷新失败, err=%v", count, err)
+		} else {
+			logx.Errorf("ProvinceCache 刷新失败(%d/%d), err=%v", count, c.maxFailLog, err)
+		}
+		// 加载失败时保留旧数据，不覆盖为空
 		return
 	}
 
@@ -96,6 +118,7 @@ func (c *ProvinceCache) load(ctx context.Context) {
 
 	c.mu.Lock()
 	c.data = list
+	c.failCount.Store(0) // 成功后重置失败计数
 	c.mu.Unlock()
 	logx.Infof("ProvinceCache 刷新成功, count=%d", len(list))
 }

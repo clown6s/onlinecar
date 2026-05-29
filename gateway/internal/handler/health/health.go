@@ -25,23 +25,23 @@ func HealthHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 
 		driverOk := checkGRPCHealth(svcCtx.DriverConn, "driver.rpc")
 		if driverOk {
-			details["service_a"] = "ok"
+			details["driver"] = "ok"
 		} else {
-			details["service_a"] = "unhealthy"
+			details["driver"] = "unhealthy"
 		}
 
 		passengerOk := checkGRPCHealth(svcCtx.PassengerConn, "passenger.rpc")
 		if passengerOk {
-			details["service_b"] = "ok"
+			details["passenger"] = "ok"
 		} else {
-			details["service_b"] = "unhealthy"
+			details["passenger"] = "unhealthy"
 		}
 
 		districtOk := checkGRPCHealth(svcCtx.DistrictConn, "district.rpc")
 		if districtOk {
-			details["service_c"] = "ok"
+			details["district"] = "ok"
 		} else {
-			details["service_c"] = "unhealthy"
+			details["district"] = "unhealthy"
 		}
 
 		redisOk := checkRedisHealth(svcCtx.Redis)

@@ -29,4 +29,6 @@ COPY --from=builder --chown=appuser:appgroup /gateway /gateway
 COPY --from=builder --chown=appuser:appgroup /app/etc/gateway.yaml ./etc/gateway.yaml
 
 EXPOSE 7000
+HEALTHCHECK --interval=10s --timeout=5s --retries=3 --start-period=15s \
+  CMD wget --spider -q http://localhost:7000/healthz || exit 1
 CMD ["/gateway", "-f", "etc/gateway.yaml"]

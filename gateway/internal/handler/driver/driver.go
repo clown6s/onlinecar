@@ -45,6 +45,10 @@ func RegisterHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			response.Error(w, http.StatusBadRequest, errorx.ErrCodeParam, "营运类型须为1(网约车)、2(出租车)或3(其他)")
 			return
 		}
+		if req.Code == "" {
+			response.Error(w, http.StatusBadRequest, errorx.ErrCodeParam, "验证码不能为空")
+			return
+		}
 		l := driverlogic.NewRegisterLogic(r.Context(), svcCtx)
 		resp, err := l.Register(&req)
 		response.Response(w, resp, err)
@@ -89,6 +93,14 @@ func UpdateLocationHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		}
 		l := driverlogic.NewUpdateLocationLogic(r.Context(), svcCtx)
 		err := l.UpdateLocation(&req)
+		response.Response(w, nil, err)
+	}
+}
+
+func LogoutHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		l := driverlogic.NewLogoutLogic(r.Context(), svcCtx)
+		err := l.Logout(r)
 		response.Response(w, nil, err)
 	}
 }

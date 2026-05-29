@@ -75,13 +75,13 @@ type CreateTripReq struct {
 }
 
 type TripResp struct {
-	Id          int64   `json:"id"`
-	PassengerId int64   `json:"passengerId"`
-	DriverId    int64   `json:"driverId"`
-	Origin      string  `json:"origin"`
-	Destination string  `json:"destination"`
-	Status      int64   `json:"status"`
-	Fare        float64 `json:"fare"`
+	Id          int64  `json:"id"`
+	PassengerId int64  `json:"passengerId"`
+	DriverId    int64  `json:"driverId"`
+	Origin      string `json:"origin"`
+	Destination string `json:"destination"`
+	Status      int64  `json:"status"`
+	Fare        string `json:"fare"` // 金额(元)，字符串格式避免浮点精度丢失，如 "12.34"
 }
 
 // ========== 行政区划 ==========

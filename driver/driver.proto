@@ -4,6 +4,8 @@ package driver;
 
 option go_package = "./pb";
 
+import "google/protobuf/timestamp.proto";
+
 // ========== 司机服务 ==========
 service Driver {
   // 注册
@@ -39,6 +41,7 @@ message RegisterResp {
   string driver_name     = 2;
   string driver_phone    = 3;
   int64  state           = 4; // 0有效 1失效
+  google.protobuf.Timestamp created_at = 5;
 }
 
 // 登录请求（手机号直接登录，验证码在 Gateway 层校验）
@@ -51,6 +54,7 @@ message LoginResp {
   int64  id           = 1;
   string driver_name  = 2;
   int64  state        = 3;
+  google.protobuf.Timestamp created_at = 4;
 }
 
 // 更新位置

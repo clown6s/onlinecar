@@ -11,6 +11,7 @@ type (
 	DriverRegisterReq {
 		Name           string `json:"name"`
 		Phone          string `json:"phone"`
+		Code           string `json:"code"`
 		VehicleNo      string `json:"vehicleNo"`
 		VehicleType    string `json:"vehicleType"`
 		CommercialType int64  `json:"commercialType,optional"`
@@ -49,6 +50,7 @@ type (
 	PassengerRegisterReq {
 		Name   string `json:"name"`
 		Phone  string `json:"phone"`
+		Code   string `json:"code"`
 		Gender int64  `json:"gender,optional"`
 	}
 	PassengerLoginReq {
@@ -83,13 +85,13 @@ type (
 		DestLat     float64 `json:"destLat"`
 	}
 	TripResp {
-		Id          int64   `json:"id"`
-		PassengerId int64   `json:"passengerId"`
-		DriverId    int64   `json:"driverId"`
-		Origin      string  `json:"origin"`
-		Destination string  `json:"destination"`
-		Status      int64   `json:"status"`
-		Fare        float64 `json:"fare"`
+		Id          int64  `json:"id"`
+		PassengerId int64  `json:"passengerId"`
+		DriverId    int64  `json:"driverId"`
+		Origin      string `json:"origin"`
+		Destination string `json:"destination"`
+		Status      int64  `json:"status"`
+		Fare        string `json:"fare"` // 金额(元)，字符串格式避免浮点精度丢失，如 "12.34"
 	}
 )
 

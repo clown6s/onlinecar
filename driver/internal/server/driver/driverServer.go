@@ -7,7 +7,7 @@ package server
 import (
 	"context"
 
-	"onlinecar-driver/internal/logic/driver"
+	driverlogic "onlinecar-driver/internal/logic/driver"
 	"onlinecar-driver/internal/svc"
 	"onlinecar-driver/pb"
 )
@@ -59,8 +59,8 @@ func (s *DriverServer) UpdateDriverWorkStatus(ctx context.Context, in *pb.Update
 	return l.UpdateDriverWorkStatus(in)
 }
 
-// 检查手机号是否注册
+// Deprecated: CheckPhone 已废弃，不再暴露手机号注册状态，防止枚举攻击。
+// gRPC 端口未对外暴露，此方法保留仅为避免 proto 兼容性问题。
 func (s *DriverServer) CheckPhone(ctx context.Context, in *pb.CheckPhoneReq) (*pb.CheckPhoneResp, error) {
-	l := driverlogic.NewCheckPhoneLogic(ctx, s.svcCtx)
-	return l.CheckPhone(in)
+	return &pb.CheckPhoneResp{Exists: false}, nil
 }

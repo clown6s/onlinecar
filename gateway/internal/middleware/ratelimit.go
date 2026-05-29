@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"container/list"
 	"context"
 	"net"
 	"net/http"
@@ -22,7 +23,8 @@ var (
 
 type ipLimiter struct {
 	limiter *rate.Limiter
-	lastRef time.Time
+	element *list.Element // LRU 链表元素
+	lastRef time.Time     // 最后访问时间（用于定期清理）
 }
 
 type RateLimitMiddleware struct {
@@ -30,9 +32,10 @@ type RateLimitMiddleware struct {
 	burst           int // 突发容量
 	mu              sync.Mutex
 	limiters        map[string]*ipLimiter
+	lru             *list.List // LRU 双向链表（按访问时间排序）
+	maxEntries      int        // map 最大条目数（防止 DDoS 下 OOM）
 	cleanupInterval time.Duration
 	maxIdle         time.Duration // IP 无请求多久后清理
-	maxEntries      int           // map 最大条目数（防止 DDoS 下 OOM）
 	trustedSubnets  []*net.IPNet  // 可信代理网段
 	ctx             context.Context
 	cancel          context.CancelFunc
@@ -50,9 +53,10 @@ func NewRateLimitMiddleware(r int, trustedSubnets ...string) *RateLimitMiddlewar
 		rate:            r,
 		burst:           burst,
 		limiters:        make(map[string]*ipLimiter),
+		lru:             list.New(),
+		maxEntries:      defaultMaxEntries,
 		cleanupInterval: 5 * time.Minute,
 		maxIdle:         10 * time.Minute,
-		maxEntries:      defaultMaxEntries,
 		ctx:             ctx,
 		cancel:          cancel,
 	}
@@ -72,60 +76,39 @@ func NewRateLimitMiddleware(r int, trustedSubnets ...string) *RateLimitMiddlewar
 	return m
 }
 
-// isTrustedProxy 检查请求来源 IP 是否属于可信代理网段
-func (m *RateLimitMiddleware) isTrustedProxy(remoteAddr string) bool {
-	if len(m.trustedSubnets) == 0 {
-		// 未配置可信代理时，不信任任何代理头
-		return false
-	}
-	// 去除端口号
-	host, _, err := net.SplitHostPort(remoteAddr)
-	if err != nil {
-		host = remoteAddr
-	}
-	ip := net.ParseIP(host)
-	if ip == nil {
-		return false
-	}
-	for _, network := range m.trustedSubnets {
-		if network.Contains(ip) {
-			return true
-		}
-	}
-	return false
-}
-
 func (m *RateLimitMiddleware) getLimiter(ip string) *ipLimiter {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// 防止 DDoS 下 map 无限增长：淘汰最旧条目（LRU），而非直接拒绝新 IP
-	if len(m.limiters) >= m.maxEntries {
-		var oldestIP string
-		var oldestTime time.Time
-		for ip, l := range m.limiters {
-			if oldestIP == "" || l.lastRef.Before(oldestTime) {
-				oldestIP = ip
-				oldestTime = l.lastRef
-			}
-		}
-		delete(m.limiters, oldestIP)
+	// 已存在则移动到链表尾部（最近访问），并更新时间
+	if limiter, ok := m.limiters[ip]; ok {
+		m.lru.MoveToBack(limiter.element)
+		limiter.lastRef = time.Now()
+		return limiter
 	}
 
-	limiter, ok := m.limiters[ip]
-	if !ok {
-		limiter = &ipLimiter{
-			limiter: rate.NewLimiter(rate.Limit(m.rate), m.burst),
-			lastRef: time.Now(),
+	// 容量满时淘汰链表头部（最久未访问）
+	if m.lru.Len() >= m.maxEntries {
+		oldest := m.lru.Front()
+		if oldest != nil {
+			m.lru.Remove(oldest)
+			delete(m.limiters, oldest.Value.(string))
 		}
-		m.limiters[ip] = limiter
-	} else {
-		limiter.lastRef = time.Now()
 	}
+
+	// 创建新条目并放到链表尾部
+	elem := m.lru.PushBack(ip)
+	limiter := &ipLimiter{
+		limiter: rate.NewLimiter(rate.Limit(m.rate), m.burst),
+		element: elem,
+		lastRef: time.Now(),
+	}
+	m.limiters[ip] = limiter
 	return limiter
 }
 
 // cleanupLoop 定期清理长时间无请求的 IP limiter
+// 利用 LRU 链表的有序性：链表头部是最久未访问的，从头部遍历直到找到未过期的
 func (m *RateLimitMiddleware) cleanupLoop() {
 	ticker := time.NewTicker(m.cleanupInterval)
 	defer ticker.Stop()
@@ -137,16 +120,22 @@ func (m *RateLimitMiddleware) cleanupLoop() {
 			m.mu.Lock()
 			now := time.Now()
 			count := 0
-			for ip, limiter := range m.limiters {
-				if now.Sub(limiter.lastRef) > m.maxIdle {
-					delete(m.limiters, ip)
-					count++
+			for elem := m.lru.Front(); elem != nil; {
+				ip := elem.Value.(string)
+				limiter := m.limiters[ip]
+				if now.Sub(limiter.lastRef) <= m.maxIdle {
+					break // LRU 有序，此元素及后续均未过期
 				}
+				next := elem.Next()
+				m.lru.Remove(elem)
+				delete(m.limiters, ip)
+				count++
+				elem = next
 			}
 			m.mu.Unlock()
 			if count > 0 {
 				logx.Infof("[RATELIMIT] 清理了 %d 个过期 IP 限流器, 剩余 %d 个",
-					count, len(m.limiters))
+					count, m.lru.Len())
 			}
 		}
 	}

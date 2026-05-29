@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: passenger
+  namespace: onlinecar
+  labels:
+    app: passenger
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: passenger
+  template:
+    metadata:
+      labels:
+        app: passenger
+    spec:
+      containers:
+        - name: passenger
+          image: onlinecar/passenger:latest
+          ports:
+            - containerPort: 6001
+              name: grpc
+            - containerPort: 9101
+              name: metrics
+          envFrom:
+            - configMapRef:
+                name: onlinecar-env
+            - secretRef:
+                name: onlinecar-secrets
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "passenger.rpc"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: onlinecar-secrets
+                  key: mysql-app-password
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: passenger
+  namespace: onlinecar
+spec:
+  selector:
+    app: passenger
+  ports:
+    - port: 6001
+      targetPort: grpc
+      name: grpc
+    - port: 9101
+      targetPort: metrics
+      name: metrics
+  type: ClusterIP

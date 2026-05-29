@@ -17,6 +17,10 @@ DriverRpc:
   Timeout: 5000
   KeepaliveTime: "30s"
   NonBlock: true
+  # 断路器：ResourceNotFound 和 PermissionDenied 不重试，避免无效重试放大压力
+  DoNotRetryGrpcCodes:
+    - ResourceNotFound
+    - PermissionDenied
   Etcd:
     Hosts:
       - 10.211.55.5:2379
@@ -27,27 +31,33 @@ PassengerRpc:
   Timeout: 5000
   KeepaliveTime: "30s"
   NonBlock: true
+  DoNotRetryGrpcCodes:
+    - ResourceNotFound
+    - PermissionDenied
   Etcd:
     Hosts:
       - 10.211.55.5:2379
     Key: passenger.rpc
-
 
 # District RPC
 DistrictRpc:
   Timeout: 5000
   KeepaliveTime: "30s"
   NonBlock: true
+  DoNotRetryGrpcCodes:
+    - ResourceNotFound
+    - PermissionDenied
   Etcd:
     Hosts:
       - 10.211.55.5:2379
     Key: district.rpc
 
-# Redis
+# Redis — 连接池配置
 RedisConf:
   Host: 10.211.55.5:6379
   Type: node
   Pass: "admin@zzp"
+  PoolSize: 100
 
 # CORS — 生产环境填写具体域名，开发环境按需添加 localhost
 CORS:

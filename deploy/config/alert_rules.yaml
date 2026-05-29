@@ -1,0 +1,81 @@
+groups:
+  - name: onlinecar-api
+    rules:
+      # Gateway HTTP 错误率 > 1%
+      - alert: HighHTTPErrorRate
+        expr: |
+          (
+            sum(rate(onlinecar_gateway_http_requests_total{status=~"5.."}[5m])) by (job)
+            /
+            sum(rate(onlinecar_gateway_http_requests_total[5m])) by (job)
+          ) > 0.01
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "HTTP 5xx 错误率超过 1%"
+          description: "服务 {{ $labels.job }} 的 5xx 错误率为 {{ $value | humanizePercentage }}"
+
+      # Gateway P99 延迟 > 2s
+      - alert: HighHTTPLatency
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(onlinecar_gateway_http_request_duration_seconds_bucket[5m])) by (le, job)
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HTTP P99 延迟超过 2s"
+          description: "服务 {{ $labels.job }} P99 延迟为 {{ $value }}s"
+
+      # Gateway 在线请求 > 500
+      - alert: HighInFlightRequests
+        expr: onlinecar_gateway_http_requests_in_flight > 500
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "在线请求数过高"
+          description: "当前在线请求数为 {{ $value }}"
+
+  - name: onlinecar-grpc
+    rules:
+      # gRPC 错误率 > 1%
+      - alert: HighGRPCErrors
+        expr: |
+          (
+            sum(rate(onlinecar_grpc_requests_total{code!="OK"}[5m])) by (job)
+            /
+            sum(rate(onlinecar_grpc_requests_total[5m])) by (job)
+          ) > 0.01
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "gRPC 错误率超过 1%"
+          description: "服务 {{ $labels.job }} gRPC 错误率为 {{ $value | humanizePercentage }}"
+
+      # gRPC P99 延迟 > 1s
+      - alert: HighGRPCLatency
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(onlinecar_grpc_request_duration_seconds_bucket[5m])) by (le, job)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "gRPC P99 延迟超过 1s"
+          description: "服务 {{ $labels.job }} P99 延迟为 {{ $value }}s"
+
+      # gRPC Unavailable（服务不可达）
+      - alert: GRPCServiceUnavailable
+        expr: |
+          sum(rate(onlinecar_grpc_requests_total{code="Unavailable"}[1m])) by (job) > 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "gRPC 服务不可达"
+          description: "服务 {{ $labels.job }} 出现 Unavailable 错误"

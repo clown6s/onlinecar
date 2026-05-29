@@ -98,8 +98,8 @@ func (m *mockTripModel) FindActiveTrips(ctx context.Context, passengerId int64, 
 	return nil, nil
 }
 
-func (m *mockTripModel) Update(ctx context.Context, data *model.Trip) error {
-	return nil
+func (m *mockTripModel) Update(ctx context.Context, data *model.Trip) (bool, error) {
+	return true, nil
 }
 
 func (m *mockTripModel) UpdateWithStatusCheck(ctx context.Context, data *model.Trip, expectedStatus int8) (bool, error) {

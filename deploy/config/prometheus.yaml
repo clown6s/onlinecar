@@ -1,0 +1,60 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # ========== 业务服务 ==========
+  - job_name: "gateway"
+    static_configs:
+      - targets: ["gateway:7000"]
+    metrics_path: "/metrics"
+    scrape_interval: 10s
+
+  - job_name: "driver"
+    static_configs:
+      - targets: ["driver:9100"]
+    metrics_path: "/metrics"
+    scrape_interval: 10s
+
+  - job_name: "passenger"
+    static_configs:
+      - targets: ["passenger:9101"]
+    metrics_path: "/metrics"
+    scrape_interval: 10s
+
+  - job_name: "district"
+    static_configs:
+      - targets: ["district:9102"]
+    metrics_path: "/metrics"
+    scrape_interval: 10s
+
+  # ========== 基础设施 ==========
+  - job_name: "mysql"
+    static_configs:
+      - targets: ["mysql-exporter:9104"]
+    scrape_interval: 30s
+
+  - job_name: "redis"
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+    scrape_interval: 15s
+
+  - job_name: "etcd"
+    static_configs:
+      - targets: ["etcd-1:2379", "etcd-2:2379", "etcd-3:2379"]
+    scrape_interval: 15s
+    scheme: http
+    metrics_path: "/metrics"
+
+  - job_name: "loki"
+    static_configs:
+      - targets: ["loki:3100"]
+    scrape_interval: 30s
+
+rule_files:
+  - "alert_rules.yaml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]

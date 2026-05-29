@@ -1,0 +1,16 @@
+.git/
+.gitignore
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+LICENSE
+vendor/
+testdata/
+*_test.go
+etc/*.yaml
+deploy/
+k8s/

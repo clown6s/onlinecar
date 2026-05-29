@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: driver
+  namespace: onlinecar
+  labels:
+    app: driver
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: driver
+  template:
+    metadata:
+      labels:
+        app: driver
+    spec:
+      containers:
+        - name: driver
+          image: onlinecar/driver:latest
+          ports:
+            - containerPort: 6000
+              name: grpc
+            - containerPort: 9100
+              name: metrics
+          envFrom:
+            - configMapRef:
+                name: onlinecar-env
+            - secretRef:
+                name: onlinecar-secrets
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "driver.rpc"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: onlinecar-secrets
+                  key: mysql-app-password
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: onlinecar-secrets
+                  key: redis-password
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: driver
+  namespace: onlinecar
+spec:
+  selector:
+    app: driver
+  ports:
+    - port: 6000
+      targetPort: grpc
+      name: grpc
+    - port: 9100
+      targetPort: metrics
+      name: metrics
+  type: ClusterIP

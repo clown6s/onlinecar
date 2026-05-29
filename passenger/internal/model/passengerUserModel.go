@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"onlinecar-common/errorx"
+
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )
 
@@ -17,8 +19,8 @@ var (
 		"passenger_name", "passenger_gender", "state", "profile_photo",
 	}
 
-	// ErrNotFound 记录不存在（与 driver 模块保持一致的错误处理模式）
-	ErrNotFound = errors.New("record not found")
+	// ErrNotFound 记录不存在（使用 common 包统一定义，跨模块 errors.Is 兼容）
+	ErrNotFound = errorx.ErrDBNotFound
 )
 
 type (

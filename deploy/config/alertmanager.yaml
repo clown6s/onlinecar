@@ -1,0 +1,28 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ["alertname", "job"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: "null"
+  routes:
+    - match:
+        severity: critical
+      receiver: "critical-webhook"
+      group_wait: 10s
+      repeat_interval: 1h
+    # 取消注释以启用 default webhook 通知（配置飞书/钉钉等 webhook URL）
+    # - receiver: "webhook"
+    #   continue: true
+
+receivers:
+  - name: "null"
+    # 默认静默接收器，避免未配置时告警丢失
+
+  - name: "critical-webhook"
+    # TODO: 替换为实际的飞书/钉钉 webhook URL
+    # webhook_configs:
+    #   - url: "https://open.feishu.cn/open-apis/bot/v2/hook/xxxxxxxx"
+    #     send_resolved: true

@@ -34,6 +34,10 @@ func RegisterHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			response.Error(w, http.StatusBadRequest, errorx.ErrCodeParam, "性别取值无效（0=未知, 1=男, 2=女）")
 			return
 		}
+		if req.Code == "" {
+			response.Error(w, http.StatusBadRequest, errorx.ErrCodeParam, "验证码不能为空")
+			return
+		}
 		l := passengerlogic.NewRegisterLogic(r.Context(), svcCtx)
 		resp, err := l.Register(&req)
 		response.Response(w, resp, err)
@@ -58,5 +62,13 @@ func LoginHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		l := passengerlogic.NewLoginLogic(r.Context(), svcCtx)
 		resp, err := l.Login(&req)
 		response.Response(w, resp, err)
+	}
+}
+
+func LogoutHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		l := passengerlogic.NewLogoutLogic(r.Context(), svcCtx)
+		err := l.Logout(r)
+		response.Response(w, nil, err)
 	}
 }

@@ -7,7 +7,7 @@ package server
 import (
 	"context"
 
-	"onlinecar-passenger/internal/logic/passenger"
+	passengerlogic "onlinecar-passenger/internal/logic/passenger"
 	"onlinecar-passenger/internal/svc"
 	"onlinecar-passenger/pb"
 )

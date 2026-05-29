@@ -31,6 +31,7 @@ func main() {
 
 	var c config.Config
 	conf.MustLoad(*configFile, &c)
+	c.DataSource = os.ExpandEnv(c.DataSource)
 
 	logx.MustSetup(c.Log)
 	logx.DisableStat()
@@ -40,6 +41,8 @@ func main() {
 	srv := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
 		pb.RegisterDistrictServiceServer(grpcServer, districtserviceServer.NewDistrictServiceServer(svcCtx))
 	})
+	// 启动 Prometheus metrics HTTP 端点
+	defer grpcx.StartMetricsServer(c.MetricsPort, "district.rpc")()
 	// 设置服务端参数
 	srv.AddOptions(
 		// 限制最大消息大小为 4MB（默认值显式声明，可根据业务调整）

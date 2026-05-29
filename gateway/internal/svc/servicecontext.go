@@ -1,6 +1,7 @@
 package svc
 
 import (
+	"errors"
 	"os"
 	"time"
 
@@ -51,7 +52,7 @@ func (s *ServiceContext) Close() error {
 		s.ProvinceCache.Stop()
 	}
 	if len(errs) > 0 {
-		return errs[0]
+		return errors.Join(errs...)
 	}
 	return nil
 }

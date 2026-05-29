@@ -3,6 +3,7 @@ package driverlogic
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 
 	"onlinecar-common/errorx"
@@ -19,12 +20,12 @@ type UpdateLocationLogic struct {
 }
 
 // updateLocationScript 原子写入司机位置 + 更新时间戳
-// 注意：此脚本不为 Redis key 设置 TTL，过期数据由 driver.go 中的后台 goroutine
-// 每小时扫描 driver:last_update 并清理超过 24h 的条目。这是有意设计：
-// 如果服务重启，goroutine 会自动恢复清理，无需担心数据无限增长。
+// 使用 per-driver key（driver:last_update:{id}）而非单个 hash，避免活跃司机重置所有历史记录的 TTL。
+// GEO key 和 per-driver key 均设置 48h EXPIRE 作为兜底清理机制。
 const updateLocationScript = `
 redis.call('GEOADD', KEYS[1], ARGV[1], ARGV[2], ARGV[3])
-redis.call('HSET', KEYS[2], ARGV[3], ARGV[4])
+redis.call('SET', KEYS[2], ARGV[4], 'EX', ARGV[5])
+redis.call('EXPIRE', KEYS[1], ARGV[6])
 return 1
 `
 
@@ -44,8 +45,16 @@ func (l *UpdateLocationLogic) UpdateLocation(in *pb.UpdateLocationReq) (*pb.Empt
 		return nil, errorx.NewCodeError(errorx.ErrCodeParam, "无效的司机ID")
 	}
 
+	// 经纬度合法性校验
+	if math.IsNaN(in.Lng) || math.IsInf(in.Lng, 0) || math.IsNaN(in.Lat) || math.IsInf(in.Lat, 0) {
+		return nil, errorx.NewCodeError(errorx.ErrCodeParam, "坐标无效，经纬度不能为NaN或无穷大")
+	}
+	if in.Lng < -180 || in.Lng > 180 || in.Lat < -90 || in.Lat > 90 {
+		return nil, errorx.NewCodeError(errorx.ErrCodeParam, "坐标无效，经度范围[-180,180]，纬度范围[-90,90]")
+	}
+
 	key := "driver:location"
-	lastUpdateKey := "driver:last_update"
+	lastUpdateKey := fmt.Sprintf("driver:last_update:%d", in.Id)
 	member := fmt.Sprintf("%d", in.Id)
 
 	if l.svcCtx.Redis == nil {
@@ -53,10 +62,10 @@ func (l *UpdateLocationLogic) UpdateLocation(in *pb.UpdateLocationReq) (*pb.Empt
 		return nil, errorx.ErrServer
 	}
 
-	// GEOADD 写入位置，使用 HSET 记录每个司机的最后更新时间戳
-	// 不再使用全局 EXPIRE，改由后台 goroutine 根据 driver:last_update 清理过期数据（24h 阈值）
+	// GEOADD 写入位置，SET per-driver 更新时间戳（各自独立 TTL）
 	now := time.Now().Unix()
-	result, err := l.svcCtx.Redis.Eval(updateLocationScript, []string{key, lastUpdateKey}, in.Lng, in.Lat, member, now)
+	ttlSeconds := int64(48 * time.Hour.Seconds())
+	result, err := l.svcCtx.Redis.Eval(updateLocationScript, []string{key, lastUpdateKey}, in.Lng, in.Lat, member, now, ttlSeconds, ttlSeconds)
 	if err != nil {
 		l.Errorf("Redis GEOADD 失败, driverId=%d, err=%v", in.Id, err)
 		return nil, errorx.ErrServer

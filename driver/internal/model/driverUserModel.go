@@ -264,6 +264,10 @@ type driverDetailRow struct {
 }
 
 // FindDriverDetail 使用 JOIN 一次性获取司机、车辆绑定和车辆信息
+// 前置索引要求：
+//   - driver_car_binding_relationship(driver_id, bind_state) 复合索引
+//   - car(id) 主键索引（通常已有）
+//   - driver_user(id) 主键索引（通常已有）
 func (m *defaultDriverUserModel) FindDriverDetail(ctx context.Context, driverId int64) (*DriverUser, *DriverCarBinding, *Car, error) {
 	query := `SELECT
 		du.id AS du_id, du.address AS du_address, du.driver_name AS du_driver_name, du.driver_phone AS du_driver_phone,

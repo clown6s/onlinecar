@@ -89,7 +89,15 @@ func (m *JWTAuthMiddleware) Handle(next http.HandlerFunc) http.HandlerFunc {
 			tokenHash := fmt.Sprintf("%x", sha256.Sum256([]byte(parts[1])))
 			blacklistKey := "token:blacklist:" + tokenHash
 			val, err := m.Redis.Get(blacklistKey)
-			if err == nil && val != "" {
+			if err != nil {
+				// Redis 不可用时选择安全策略：拒绝请求，防止黑名单失效
+				if !strings.Contains(err.Error(), "nil") {
+					logx.Errorf("Redis blacklist check failed: %v, method=%s, path=%s", err, r.Method, r.URL.Path)
+					httpx.Error(w, errorx.ErrServer)
+					return
+				}
+				// redis.Nil 表示 key 不存在，放行
+			} else if val != "" {
 				logx.Infof("认证失败: token已失效(黑名单), method=%s, path=%s, ip=%s",
 					r.Method, r.URL.Path, r.RemoteAddr)
 				httpx.Error(w, errorx.ErrTokenInvalid)

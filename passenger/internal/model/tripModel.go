@@ -17,6 +17,12 @@ var (
 		"origin_lng", "origin_lat", "dest_lng", "dest_lat",
 		"status", "fare", "gmt_create", "gmt_modified",
 	}
+
+	// 行程状态常量，避免 magic number
+	TripStatusCreated   int8 = 0 // 待接单
+	TripStatusAccepted  int8 = 1 // 进行中
+	TripStatusCompleted int8 = 2 // 已完成
+	TripStatusCancelled int8 = 3 // 已取消
 )
 
 type (
@@ -24,10 +30,13 @@ type (
 		Insert(ctx context.Context, data *Trip) (sql.Result, error)
 		InsertWithConn(ctx context.Context, session sqlx.Session, data *Trip) (sql.Result, error)
 		FindOne(ctx context.Context, id int64) (*Trip, error)
+		FindOneWithConn(ctx context.Context, session sqlx.Session, id int64) (*Trip, error)
 		FindByPassengerId(ctx context.Context, passengerId int64, page, pageSize int) ([]*Trip, error)
+		CountByPassengerId(ctx context.Context, passengerId int64) (int64, error)
 		FindByPassengerIdAndStatus(ctx context.Context, passengerId int64, status int8, page, pageSize int) ([]*Trip, error)
 		FindActiveTrips(ctx context.Context, passengerId int64, statuses []int8) ([]*Trip, error)
-		Update(ctx context.Context, data *Trip) error
+		FindActiveTripsWithConn(ctx context.Context, session sqlx.Session, passengerId int64, statuses []int8) ([]*Trip, error)
+		Update(ctx context.Context, data *Trip) (bool, error)
 		UpdateWithStatusCheck(ctx context.Context, data *Trip, expectedStatus int8) (bool, error)
 	}
 
@@ -47,7 +56,7 @@ type (
 		DestLng     float64    `db:"dest_lng"`
 		DestLat     float64    `db:"dest_lat"`
 		Status      int8       `db:"status"` // 0待接单 1进行中 2已完成 3已取消
-		Fare        float64    `db:"fare"`
+		Fare        float64    `db:"fare"`   // 金额：DB 层须为 DECIMAL(10,2)，Go float64 读写无精度丢失；仅在 Go 侧做金额运算时须改用 decimal 库
 		GmtCreate   *time.Time `db:"gmt_create"`
 		GmtModified *time.Time `db:"gmt_modified"`
 	}
@@ -107,6 +116,20 @@ func (m *defaultTripModel) FindOne(ctx context.Context, id int64) (*Trip, error)
 	return &resp, nil
 }
 
+// FindOneWithConn 使用指定 session 查询（事务内使用）
+func (m *defaultTripModel) FindOneWithConn(ctx context.Context, session sqlx.Session, id int64) (*Trip, error) {
+	query := fmt.Sprintf("SELECT %s FROM %s WHERE `id` = ? LIMIT 1", strings.Join(tripFieldNames, ","), m.table)
+	var resp Trip
+	err := session.QueryRowCtx(ctx, &resp, query, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return &resp, nil
+}
+
 func (m *defaultTripModel) FindByPassengerId(ctx context.Context, passengerId int64, page, pageSize int) ([]*Trip, error) {
 	if page < 1 {
 		page = 1
@@ -124,6 +147,14 @@ func (m *defaultTripModel) FindByPassengerId(ctx context.Context, passengerId in
 		return nil, err
 	}
 	return resp, nil
+}
+
+// CountByPassengerId 统计乘客行程总数（用于分页）
+func (m *defaultTripModel) CountByPassengerId(ctx context.Context, passengerId int64) (int64, error) {
+	query := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE `passenger_id` = ?", m.table)
+	var count int64
+	err := m.conn.QueryRowCtx(ctx, &count, query, passengerId)
+	return count, err
 }
 
 func (m *defaultTripModel) FindByPassengerIdAndStatus(ctx context.Context, passengerId int64, status int8, page, pageSize int) ([]*Trip, error) {
@@ -171,7 +202,35 @@ func (m *defaultTripModel) FindActiveTrips(ctx context.Context, passengerId int6
 	return trips, nil
 }
 
-func (m *defaultTripModel) Update(ctx context.Context, data *Trip) error {
+// FindActiveTripsWithConn 使用指定 session 查询（事务内使用）
+func (m *defaultTripModel) FindActiveTripsWithConn(ctx context.Context, session sqlx.Session, passengerId int64, statuses []int8) ([]*Trip, error) {
+	if len(statuses) == 0 {
+		return nil, nil
+	}
+
+	placeholders := make([]string, len(statuses))
+	args := make([]interface{}, 0, len(statuses)+1)
+	args = append(args, passengerId)
+	for i, s := range statuses {
+		placeholders[i] = "?"
+		args = append(args, s)
+	}
+
+	query := fmt.Sprintf("SELECT %s FROM %s WHERE `passenger_id` = ? AND `status` IN (%s) ORDER BY `id` DESC LIMIT 1",
+		strings.Join(tripFieldNames, ","), m.table, strings.Join(placeholders, ","))
+
+	var trips []*Trip
+	err := session.QueryRowsCtx(ctx, &trips, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	return trips, nil
+}
+
+// Update 更新行程（通用方法）。
+// ⚠️ Deprecated: 此方法无状态校验，可能导致非法状态转换。请优先使用 UpdateWithStatusCheck。
+// 仅用于非状态变更的更新场景（如仅更新费用）。
+func (m *defaultTripModel) Update(ctx context.Context, data *Trip) (bool, error) {
 	now := time.Now()
 	data.GmtModified = &now
 
@@ -179,10 +238,14 @@ func (m *defaultTripModel) Update(ctx context.Context, data *Trip) error {
 		"UPDATE %s SET `driver_id`=?,`status`=?,`fare`=?,`gmt_modified`=? WHERE `id` = ?",
 		m.table,
 	)
-	_, err := m.conn.ExecCtx(ctx, query,
+	ret, err := m.conn.ExecCtx(ctx, query,
 		data.DriverId, data.Status, data.Fare, data.GmtModified, data.Id,
 	)
-	return err
+	if err != nil {
+		return false, err
+	}
+	affected, _ := ret.RowsAffected()
+	return affected > 0, nil
 }
 
 // UpdateWithStatusCheck 带状态前置检查的更新（乐观锁）

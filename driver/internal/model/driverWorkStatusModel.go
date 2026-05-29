@@ -44,6 +44,8 @@ func NewDriverWorkStatusModel(conn sqlx.SqlConn) DriverWorkStatusModel {
 	}
 }
 
+// Upsert 创建或更新司机工作状态
+// 前置依赖：driver_user_work_status 表的 driver_id 列必须有唯一索引
 func (m *defaultDriverWorkStatusModel) Upsert(ctx context.Context, driverId, workStatus int64) error {
 	now := time.Now()
 	query := fmt.Sprintf(

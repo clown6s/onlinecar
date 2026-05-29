@@ -12,6 +12,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+
+	"github.com/zeromicro/go-zero/core/logx"
 )
 
 // CodeError 统一业务错误类型
@@ -148,40 +150,52 @@ var (
 	ErrDatabaseError      = NewCodeError(ErrCodeDatabaseError, "数据库错误")
 )
 
-// SetGrpcBizCode 将业务错误码写入 gRPC trailer，供网关侧 MapRpcError 提取。
-// 在 RPC 服务端 UnaryInterceptor 中 handler 返回错误后调用。
-// 使用 SetTrailer 而非 SetHeader，确保在 error 场景下 trailer 仍能被发送。
+// Deprecated: SetGrpcBizCode 已废弃。当前 go-zero zrpc 客户端不透传 gRPC trailer，
+// RPC 服务端直接返回 *CodeError，Gateway 侧通过 errors.As 匹配即可。
+// 移除了 UnaryInterceptor 中的调用，此函数仅作为预留保留。
 func SetGrpcBizCode(ctx context.Context, bizCode int) {
-	_ = grpc.SetTrailer(ctx, metadata.Pairs("x-biz-code", strconv.Itoa(bizCode)))
+	if err := grpc.SetTrailer(ctx, metadata.Pairs("x-biz-code", strconv.Itoa(bizCode))); err != nil {
+		logx.Errorf("[WARN] SetGrpcBizCode 设置 trailer 失败（已知 zrpc 不透传）: %v", err)
+	}
 }
 
-// errorMsgToBizCode 错误消息 → 业务错误码映射（单一数据源，供 ErrorToBizCode 和 MapRpcError 共用）
-// 新增错误类型时只需在此处添加一行，避免两处 switch 重复维护
+// errorMsgToBizCode 错误消息 → 业务错误码映射（供 matchErrorBizCode 子串匹配 fallback 使用）
+// 新增错误类型时只需在此处添加一行
+// 注意：长匹配串必须排在短匹配串之前，否则短串会先命中（如 "验证码错误次数过多" 需在 "验证码错误" 之前）
 var errorMsgToBizCode = []struct {
 	substr  string
 	bizCode int
 }{
 	{"该手机号已注册", ErrCodePhoneRegistered},
+	{"车辆已绑定", ErrCodeVehicleBound},
 	{"车辆不存在", ErrCodeVehicleNotFound},
 	{"司机不存在", ErrCodeUserNotFound},
 	{"用户不存在", ErrCodeUserNotFound},
-	{"已禁用", ErrCodeUserDisabled},
 	{"乘客账号已禁用", ErrCodeUserDisabled},
+	{"验证码错误次数过多", ErrCodeSmsTooManyAttempts},
 	{"验证码错误", ErrCodeSmsCodeError},
 	{"验证码已过期", ErrCodeSmsCodeExpired},
 	{"发送过于频繁", ErrCodeSmsSendFrequent},
 	{"创建行程失败", ErrCodeTripCreateFailed},
 	{"行政区划不存在", ErrCodeDistrictNotFound},
-	{"验证码错误次数过多", ErrCodeSmsTooManyAttempts},
-	{"车辆已绑定", ErrCodeVehicleBound},
 	{"手机号或验证码错误", ErrCodeLoginFailed},
+	{"坐标无效", ErrCodeParam},
 	{"无效的", ErrCodeParam},
 	{"不能为空", ErrCodeParam},
-	{"坐标无效", ErrCodeParam},
+	{"已禁用", ErrCodeUserDisabled},
 }
 
-// matchErrorBizCode 根据错误消息匹配业务错误码，返回 0 表示未匹配
+// matchErrorBizCode 根据错误消息匹配业务错误码，返回 0 表示未匹配。
+// 优先尝试从 CodeError 格式 "code:NNNNN, msg:xxx" 中提取错误码，
+// 再退化为子串匹配作为兜底。
 func matchErrorBizCode(msg string) int {
+	// 优先解析结构化格式 "code:NNNNN, msg:xxx"
+	if code, ok := parseCodeFromMsg(msg); ok {
+		if ce := BizCodeToError(code); ce != nil {
+			return code
+		}
+	}
+	// fallback: 子串匹配（兼容非 CodeError 来源的错误消息）
 	for _, m := range errorMsgToBizCode {
 		if strings.Contains(msg, m.substr) {
 			return m.bizCode
@@ -190,8 +204,32 @@ func matchErrorBizCode(msg string) int {
 	return 0
 }
 
-// ErrorToBizCode 根据错误消息匹配业务错误码，供 RPC 服务端 UnaryInterceptor 使用。
-// 返回 0 表示未匹配到已知业务错误码。
+// codeMsgPattern 匹配 CodeError.Error() 格式 "code:NNNNN, msg:xxx"
+var codeMsgPrefix = "code:"
+
+// parseCodeFromMsg 从错误消息中解析业务错误码。
+// 匹配格式: "code:NNNNN, msg:..." 或 "code:NNNNN|msg:..."
+func parseCodeFromMsg(msg string) (int, bool) {
+	if !strings.HasPrefix(msg, codeMsgPrefix) {
+		return 0, false
+	}
+	rest := msg[len(codeMsgPrefix):]
+	end := len(rest)
+	for i, ch := range rest {
+		if ch == ',' || ch == '|' || ch == ' ' {
+			end = i
+			break
+		}
+	}
+	code, err := strconv.Atoi(rest[:end])
+	if err != nil {
+		return 0, false
+	}
+	return code, true
+}
+
+// Deprecated: ErrorToBizCode 已废弃（UnaryInterceptor 中已移除调用）。
+// 保留供 matchErrorBizCode 和 MapRpcError 使用。
 func ErrorToBizCode(err error) int {
 	if err == nil {
 		return 0
@@ -308,8 +346,9 @@ func MapRpcError(err error) *CodeError {
 		// }
 
 		// 通过 gRPC status code 做基础映射
+		// 非 500 状态码直接映射；500 状态码继续走 errors.As 和字符串匹配 fallback
 		httpCode := grpcCodeToHTTP(st.Code())
-		if httpCode != 500 || st.Code() == codes.Internal {
+		if httpCode != 500 {
 			return NewCodeError(httpCode, st.Message())
 		}
 	}

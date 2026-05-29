@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"strconv"
 	"time"
 
 	"onlinecar-common/errorx"
@@ -122,55 +123,53 @@ func VerifyCode(ctx context.Context, svcCtx *svc.ServiceContext, role, phone, co
 		return errorx.ErrSmsCodeExpired
 	}
 
-	// Eval 返回值类型为 int64: -1=不存在, 0=不匹配, 1=成功
-	switch val := result.(type) {
-	case int64:
-		switch val {
-		case -1:
-			return errorx.ErrSmsCodeExpired
-		case 0:
-			checkResult, checkErr := svcCtx.Redis.Eval(checkAndIncrVerifyScript, []string{verifyKey}, int(verifyTTL.Seconds()), maxVerifyAttempts)
-			if checkErr != nil {
-				logx.Errorf("[SMS] 暴力破解检查+递增失败, verifyKey=%s, err=%v", verifyKey, checkErr)
-			}
-			if cr, ok := checkResult.(int64); ok && cr == -2 {
-				return errorx.ErrSmsTooManyAttempts
-			}
-			if cs, ok := checkResult.(string); ok && cs == "-2" {
-				return errorx.ErrSmsTooManyAttempts
-			}
-			return errorx.ErrSmsCodeError
-		case 1:
-			if _, delErr := svcCtx.Redis.Del(verifyKey); delErr != nil {
-				logx.Errorf("[SMS] 删除验证计数器失败(成功后), verifyKey=%s, err=%v", verifyKey, delErr)
-			}
-			return nil
+	// Eval 返回值类型可能为 int64 或 string（go-zero 可能返回字符串形式的数字）
+	resultCode := redisResultToInt64(result)
+	switch resultCode {
+	case -1:
+		return errorx.ErrSmsCodeExpired
+	case 0:
+		// 验证码不匹配，原子递增暴力破解计数器
+		if err := checkBruteForce(svcCtx, verifyKey); err != nil {
+			return err
 		}
-	case string:
-		// go-zero 的 Eval 可能返回字符串形式的数字
-		switch val {
-		case "-1":
-			return errorx.ErrSmsCodeExpired
-		case "0":
-			checkResult, checkErr := svcCtx.Redis.Eval(checkAndIncrVerifyScript, []string{verifyKey}, int(verifyTTL.Seconds()), maxVerifyAttempts)
-			if checkErr != nil {
-				logx.Errorf("[SMS] 暴力破解检查+递增失败(字符串返回), verifyKey=%s, err=%v", verifyKey, checkErr)
-			}
-			if cr, ok := checkResult.(int64); ok && cr == -2 {
-				return errorx.ErrSmsTooManyAttempts
-			}
-			if cs, ok := checkResult.(string); ok && cs == "-2" {
-				return errorx.ErrSmsTooManyAttempts
-			}
-			return errorx.ErrSmsCodeError
-		case "1":
-			if _, delErr := svcCtx.Redis.Del(verifyKey); delErr != nil {
-				logx.Errorf("[SMS] 删除验证计数器失败(字符串成功后), verifyKey=%s, err=%v", verifyKey, delErr)
-			}
-			return nil
+		return errorx.ErrSmsCodeError
+	case 1:
+		// 验证成功，删除暴力破解计数器
+		if _, delErr := svcCtx.Redis.Del(verifyKey); delErr != nil {
+			logx.Errorf("[SMS] 删除验证计数器失败(成功后), verifyKey=%s, err=%v", verifyKey, delErr)
 		}
+		return nil
 	}
 
 	logx.Errorf("[SMS] 验证码校验返回异常值, key=%s, result=%v", codeKey, result)
 	return errorx.ErrSmsCodeExpired
+}
+
+// redisResultToInt64 将 Redis Eval 返回值统一转为 int64
+// go-zero 的 Eval 可能返回 int64 或 string 类型
+func redisResultToInt64(result interface{}) int64 {
+	switch v := result.(type) {
+	case int64:
+		return v
+	case string:
+		n, _ := strconv.ParseInt(v, 10, 64)
+		return n
+	default:
+		return 0
+	}
+}
+
+// checkBruteForce 原子检查并递增验证失败次数，超过阈值返回锁定错误
+func checkBruteForce(svcCtx *svc.ServiceContext, verifyKey string) error {
+	checkResult, err := svcCtx.Redis.Eval(checkAndIncrVerifyScript, []string{verifyKey}, int(verifyTTL.Seconds()), maxVerifyAttempts)
+	if err != nil {
+		logx.Errorf("[SMS] 暴力破解检查+递增失败, verifyKey=%s, err=%v", verifyKey, err)
+		return nil // 检查失败不阻塞验证码错误返回
+	}
+	// 统一用 int64 比较（兼容 int64 和 string "-2" 两种返回类型）
+	if redisResultToInt64(checkResult) == -2 {
+		return errorx.ErrSmsTooManyAttempts
+	}
+	return nil
 }

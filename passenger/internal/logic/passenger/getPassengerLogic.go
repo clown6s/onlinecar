@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"onlinecar-common/errorx"
+	"onlinecar-common/util"
 	"onlinecar-passenger/internal/model"
 	"onlinecar-passenger/internal/svc"
 	"onlinecar-passenger/pb"
@@ -47,7 +48,7 @@ func (l *GetPassengerLogic) GetPassenger(in *pb.GetPassengerReq) (*pb.PassengerI
 		info.PassengerName = *passengerUser.PassengerName
 	}
 	if passengerUser.PassengerPhone != nil {
-		info.PassengerPhone = *passengerUser.PassengerPhone
+		info.PassengerPhone = util.MaskPhone(*passengerUser.PassengerPhone)
 	}
 	if passengerUser.PassengerGender != nil {
 		info.PassengerGender = int64(*passengerUser.PassengerGender)

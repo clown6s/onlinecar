@@ -9,6 +9,7 @@ clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
+  # 业务服务日志（go-zero file 模式写入共享卷）
   - job_name: onlinecar
     static_configs:
       - targets:
@@ -17,3 +18,41 @@ scrape_configs:
           job: onlinecar
           env: production
         __path__: /var/log/onlinecar/**/*.log
+
+  # Nginx 访问/错误日志
+  - job_name: nginx
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          env: production
+        __path__: /var/log/nginx/*.log
+    pipeline_stages:
+      - docker: {}
+      - json:
+          expressions:
+            status: '"status"'
+            request: '"request"'
+            remote_addr: '"remote_addr"'
+            request_time: '"rt"'
+      - labels:
+          status:
+          remote_addr:
+
+  # Docker 容器 stdout/stderr 日志（基础设施服务：MySQL、Redis、etcd、Prometheus 等）
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: label
+            values: ["com.docker.compose.project=onlinecar"]
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: 'stream'
+    pipeline_stages:
+      - docker: {}

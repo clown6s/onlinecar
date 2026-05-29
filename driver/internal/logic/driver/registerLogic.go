@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 	"unicode/utf8"
 
 	"onlinecar-common/errorx"
+	"onlinecar-common/util"
 	"onlinecar-common/validate"
 	"onlinecar-driver/internal/model"
 	"onlinecar-driver/internal/svc"
@@ -33,7 +35,7 @@ func NewRegisterLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Register
 
 // 注册司机（事务：检查手机号 + 插入司机 + 车辆 + 绑定关系）
 func (l *RegisterLogic) Register(in *pb.RegisterReq) (*pb.RegisterResp, error) {
-	l.Infof("司机注册, phone=%s, name=%s", in.DriverPhone, in.DriverName)
+	l.Infof("司机注册, phone=%s, name=%s", util.MaskPhone(in.DriverPhone), util.MaskName(in.DriverName))
 
 	// 手机号格式校验
 	if !validate.IsValidPhone(in.DriverPhone) {
@@ -48,6 +50,14 @@ func (l *RegisterLogic) Register(in *pb.RegisterReq) (*pb.RegisterResp, error) {
 	commercialType := in.CommercialType
 	if commercialType <= 0 {
 		commercialType = 1 // 默认网约车
+	}
+
+	// 车辆信息必填校验（与 Gateway handler 保持一致）
+	if in.VehicleNo == "" {
+		return nil, errorx.NewCodeError(errorx.ErrCodeParam, "车牌号不能为空")
+	}
+	if in.VehicleType == "" {
+		return nil, errorx.NewCodeError(errorx.ErrCodeParam, "车辆类型不能为空")
 	}
 
 	var driverId int64
@@ -78,7 +88,7 @@ func (l *RegisterLogic) Register(in *pb.RegisterReq) (*pb.RegisterResp, error) {
 		}
 		driverId = id
 
-		// 2. 如果有车辆信息，先检查车辆是否已被其他司机绑定
+		// 3. 如果有车辆信息，先检查车辆是否已被其他司机绑定
 		if in.VehicleNo != "" {
 			existingCar, err := l.svcCtx.CarModel.FindByVehicleNoWithConn(ctx, session, in.VehicleNo)
 			if err != nil {
@@ -107,7 +117,7 @@ func (l *RegisterLogic) Register(in *pb.RegisterReq) (*pb.RegisterResp, error) {
 				return fmt.Errorf("获取车辆ID失败: %w", err)
 			}
 
-			// 3. 插入绑定关系
+			// 4. 插入绑定关系
 			bindState := 1
 			now := time.Now()
 			binding := &model.DriverCarBinding{
@@ -128,6 +138,10 @@ func (l *RegisterLogic) Register(in *pb.RegisterReq) (*pb.RegisterResp, error) {
 		var codeErr *errorx.CodeError
 		if errors.As(err, &codeErr) {
 			return nil, codeErr
+		}
+		// MySQL Duplicate key (error 1062) 映射为手机号已注册
+		if strings.Contains(err.Error(), "Error 1062") || strings.Contains(err.Error(), "Duplicate entry") {
+			return nil, errorx.ErrPhoneRegistered
 		}
 		// 系统错误返回通用信息，记录详细日志
 		l.Errorf("司机注册事务失败, phone=%s, err=%v", in.DriverPhone, err)

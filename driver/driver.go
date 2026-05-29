@@ -33,6 +33,7 @@ func main() {
 
 	var c config.Config
 	conf.MustLoad(*configFile, &c)
+	c.DataSource = os.ExpandEnv(c.DataSource)
 
 	logx.MustSetup(c.Log)
 	logx.DisableStat()
@@ -47,6 +48,8 @@ func main() {
 	srv := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
 		pb.RegisterDriverServer(grpcServer, driverserver.NewDriverServer(svcCtx))
 	})
+	// 启动 Prometheus metrics HTTP 端点
+	defer grpcx.StartMetricsServer(c.MetricsPort, "driver.rpc")()
 	// 设置服务端参数
 	srv.AddOptions(
 		// 限制最大消息大小为 4MB（默认值显式声明，可根据业务调整）
@@ -89,19 +92,21 @@ func main() {
 const driverLocationExpireThreshold = 24 * time.Hour
 
 // removeExpiredLocationScript 原子移除过期司机的位置数据和更新时间戳
+// 使用 DEL（per-driver key）而非 HDEL（hash field）
 const removeExpiredLocationScript = `
 redis.call('ZREM', KEYS[1], ARGV[1])
-redis.call('HDEL', KEYS[2], ARGV[1])
+redis.call('DEL', KEYS[2])
 return 1
 `
 
 // cleanExpiredDriverLocations 每小时清理超过 24 小时未更新位置的司机数据
+// 使用 SCAN 遍历 driver:last_update:* per-driver key，而非 HSCAN 单个 hash。
+// 每个 key 独立 TTL，活跃司机不会影响不活跃司机数据的过期。
 func cleanExpiredDriverLocations(ctx context.Context, svcCtx *svc.ServiceContext) {
 	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
 
 	locationKey := "driver:location"
-	lastUpdateKey := "driver:last_update"
 	expireThreshold := int64(driverLocationExpireThreshold.Seconds())
 
 	for {
@@ -110,28 +115,38 @@ func cleanExpiredDriverLocations(ctx context.Context, svcCtx *svc.ServiceContext
 			logx.Info("司机位置清理 goroutine 已退出")
 			return
 		case <-ticker.C:
+			if svcCtx.Redis == nil {
+				logx.Error("Redis 未初始化，跳过司机位置清理")
+				continue
+			}
 			logx.Info("开始清理过期司机位置数据...")
 
 			var cursor uint64
 			for {
-				result, nextCursor, err := svcCtx.Redis.HscanCtx(ctx, lastUpdateKey, cursor, "*", 100)
+				// SCAN 遍历所有 driver:last_update:* key
+				keys, nextCursor, err := svcCtx.Redis.ScanCtx(ctx, cursor, "driver:last_update:*", 100)
 				if err != nil {
-					logx.Errorf("HSCAN driver:last_update 失败: %v", err)
+					logx.Errorf("SCAN driver:last_update:* 失败: %v", err)
 					break
 				}
 				cursor = nextCursor
 
-				// result 是扁平数组：[field1, value1, field2, value2, ...]
 				now := time.Now().Unix()
-				for i := 0; i+1 < len(result); i += 2 {
-					driverId := result[i]
+				for _, key := range keys {
+					// GET per-driver 更新时间戳
+					val, err := svcCtx.Redis.Get(key)
+					if err != nil {
+						logx.Errorf("GET %s 失败: %v", key, err)
+						continue
+					}
 					var lastUpdate int64
-					if _, err := fmt.Sscanf(result[i+1], "%d", &lastUpdate); err != nil {
+					if _, err := fmt.Sscanf(val, "%d", &lastUpdate); err != nil {
 						continue
 					}
 					if now-lastUpdate > expireThreshold {
-						// 使用 Lua 脚本原子移除过期司机的位置数据和更新时间戳
-						if _, err := svcCtx.Redis.Eval(removeExpiredLocationScript, []string{locationKey, lastUpdateKey}, driverId); err != nil {
+						// 从 key 中提取 driverId（格式: driver:last_update:{id}）
+						driverId := key[len("driver:last_update:"):]
+						if _, err := svcCtx.Redis.Eval(removeExpiredLocationScript, []string{locationKey, key}, driverId); err != nil {
 							logx.Errorf("清理过期司机位置失败, driverId=%s, err=%v", driverId, err)
 							continue
 						}

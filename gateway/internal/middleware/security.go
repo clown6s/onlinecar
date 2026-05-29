@@ -1,11 +1,12 @@
 package middleware
 
 import (
-	"log"
 	"net"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/zeromicro/go-zero/core/logx"
 )
 
 type SecurityHeadersMiddleware struct {
@@ -21,7 +22,7 @@ func NewSecurityHeadersMiddleware(trustedProxySubnets ...string) *SecurityHeader
 	for _, cidr := range trustedProxySubnets {
 		_, network, err := net.ParseCIDR(cidr)
 		if err != nil {
-			log.Printf("[SECURITY] 解析可信代理网段失败, cidr=%s, err=%v", cidr, err)
+			logx.Errorf("[SECURITY] 解析可信代理网段失败, cidr=%s, err=%v", cidr, err)
 			continue
 		}
 		m.trustedCIDRs = append(m.trustedCIDRs, network)
@@ -63,6 +64,8 @@ func (m *SecurityHeadersMiddleware) Handle(next http.HandlerFunc) http.HandlerFu
 		w.Header().Set("X-Frame-Options", "DENY")
 		// 控制 referrer 信息泄露
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		// 内容安全策略（默认宽松，生产环境根据前端资源按需收紧）
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
 		// HSTS（仅 HTTPS，需确认来源可信以防止伪造）
 		if m.isTrustedProto(r) {
 			w.Header().Set("Strict-Transport-Security", "max-age="+strconv.Itoa(int(365*24*time.Hour.Seconds()))+"; includeSubDomains")

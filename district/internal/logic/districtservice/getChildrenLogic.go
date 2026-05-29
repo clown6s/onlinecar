@@ -27,29 +27,29 @@ func NewGetChildrenLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetCh
 	}
 }
 
-// 获取指定行政区划的直接下级子节点（带 Redis 缓存）
+// 获取指定行政区划的直接下级子节点（带 Redis 缓存，Redis 不可用时降级为直查 DB）
 func (l *GetChildrenLogic) GetChildren(in *pb.GetChildrenReq) (*pb.GetChildrenResp, error) {
 	l.Infof("获取子级行政区, parentAdCode=%d", in.ParentAdCode)
 
-	// parentAdCode=0 时复用省级缓存 key，避免同一份数据缓存两份
-	cacheKey := fmt.Sprintf("%s%s", districtCachePrefix, "province")
-	if in.ParentAdCode != 0 {
-		cacheKey = fmt.Sprintf("%s%d", districtCachePrefix, in.ParentAdCode)
-	}
+	// parentAdCode=0 时使用独立缓存 key，避免与 GetProvinces 的缓存类型混淆
+	// 两个 protobuf 结构虽然字段一致，但类型不同，混用可能导致未来分叉时缓存错误
+	cacheKey := fmt.Sprintf("%schildren:%d", districtCachePrefix, in.ParentAdCode)
 
-	// 1. 尝试读缓存
-	cached, err := l.svcCtx.Redis.Get(cacheKey)
-	if err != nil && err != redis.Nil {
-		l.Errorf("Redis 读取失败, key=%s, err=%v", cacheKey, err)
-	}
-	if err == nil && cached != "" {
-		var resp pb.GetChildrenResp
-		if err = json.Unmarshal([]byte(cached), &resp); err == nil {
-			// 缓存命中，空数组也直接返回（防穿透）
-			l.Infof("命中缓存, key=%s, count=%d", cacheKey, len(resp.List))
-			return &resp, nil
+	// 1. 尝试读缓存（Redis 可用时）
+	if l.svcCtx.Redis != nil {
+		cached, err := l.svcCtx.Redis.Get(cacheKey)
+		if err != nil && err != redis.Nil {
+			l.Errorf("Redis 读取失败, key=%s, err=%v", cacheKey, err)
 		}
-		l.Errorf("缓存反序列化失败, key=%s, err=%v", cacheKey, err)
+		if err == nil && cached != "" {
+			var resp pb.GetChildrenResp
+			if err = json.Unmarshal([]byte(cached), &resp); err == nil {
+				// 缓存命中，空数组也直接返回（防穿透）
+				l.Infof("命中缓存, key=%s, count=%d", cacheKey, len(resp.List))
+				return &resp, nil
+			}
+			l.Errorf("缓存反序列化失败, key=%s, err=%v", cacheKey, err)
+		}
 	}
 
 	// 2. 缓存未命中，使用 singleflight 防止击穿
@@ -61,11 +61,13 @@ func (l *GetChildrenLogic) GetChildren(in *pb.GetChildrenReq) (*pb.GetChildrenRe
 		default:
 		}
 
-		// double check：再次读缓存，可能其他 goroutine 已填充
-		if cached, err := l.svcCtx.Redis.Get(cacheKey); err == nil && cached != "" {
-			var resp pb.GetChildrenResp
-			if jsonErr := json.Unmarshal([]byte(cached), &resp); jsonErr == nil {
-				return &resp, nil
+		// double check：再次读缓存（Redis 可用时）
+		if l.svcCtx.Redis != nil {
+			if cached, err := l.svcCtx.Redis.Get(cacheKey); err == nil && cached != "" {
+				var resp pb.GetChildrenResp
+				if jsonErr := json.Unmarshal([]byte(cached), &resp); jsonErr == nil {
+					return &resp, nil
+				}
 			}
 		}
 
@@ -97,15 +99,17 @@ func (l *GetChildrenLogic) GetChildren(in *pb.GetChildrenReq) (*pb.GetChildrenRe
 			resp.List = append(resp.List, node)
 		}
 
-		// 写入缓存（失败不影响响应）
-		if data, marshalErr := json.Marshal(resp); marshalErr == nil {
-			ttl := int(cacheTTL().Seconds())
-			if len(list) == 0 {
-				// 缓存空结果，防穿透，5分钟TTL
-				ttl = 300
-			}
-			if setErr := l.svcCtx.Redis.Setex(cacheKey, string(data), ttl); setErr != nil {
-				l.Errorf("写入缓存失败, key=%s, err=%v", cacheKey, setErr)
+		// 写入缓存（失败不影响响应，Redis 不可用时跳过）
+		if l.svcCtx.Redis != nil {
+			if data, marshalErr := json.Marshal(resp); marshalErr == nil {
+				ttl := int(cacheTTL().Seconds())
+				if len(list) == 0 {
+					// 缓存空结果，防穿透，5分钟TTL
+					ttl = 300
+				}
+				if setErr := l.svcCtx.Redis.Setex(cacheKey, string(data), ttl); setErr != nil {
+					l.Errorf("写入缓存失败, key=%s, err=%v", cacheKey, setErr)
+				}
 			}
 		}
 

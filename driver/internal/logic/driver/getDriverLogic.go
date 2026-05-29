@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"onlinecar-common/errorx"
+	"onlinecar-common/util"
 	"onlinecar-driver/internal/model"
 	"onlinecar-driver/internal/svc"
 	"onlinecar-driver/pb"
@@ -42,7 +43,7 @@ func (l *GetDriverLogic) GetDriver(in *pb.GetDriverReq) (*pb.DriverInfo, error) 
 	info := &pb.DriverInfo{
 		Id:            driverUser.Id,
 		DriverName:    driverUser.DriverName,
-		DriverPhone:   driverUser.DriverPhone,
+		DriverPhone:   util.MaskPhone(driverUser.DriverPhone),
 		LicenseId:     driverUser.LicenseId,
 		CertificateNo: driverUser.CertificateNo,
 	}
@@ -73,8 +74,12 @@ func (l *GetDriverLogic) GetDriver(in *pb.GetDriverReq) (*pb.DriverInfo, error) 
 
 	// 查询工作状态（独立查询，保留）
 	workStatus, err := l.svcCtx.DriverWorkStatusModel.FindByDriverId(l.ctx, in.Id)
-	if err != nil && !errors.Is(err, model.ErrNotFound) {
-		l.Errorf("查询司机工作状态失败, driverId=%d, err=%v", in.Id, err)
+	if err != nil {
+		if !errors.Is(err, model.ErrNotFound) {
+			l.Errorf("查询司机工作状态失败, driverId=%d, err=%v", in.Id, err)
+			return nil, errorx.ErrServer
+		}
+		workStatus = nil
 	}
 	if workStatus != nil && workStatus.WorkStatus != nil {
 		info.WorkStatus = int64(*workStatus.WorkStatus)

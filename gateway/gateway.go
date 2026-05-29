@@ -25,6 +25,7 @@ func main() {
 
 	var c config.Config
 	conf.MustLoad(*configFile, &c)
+	logx.Must(c.Validate())
 
 	logx.MustSetup(c.Log)
 	logx.DisableStat()
@@ -33,8 +34,7 @@ func main() {
 	defer server.Stop()
 
 	ctx := svc.NewServiceContext(c)
-	defer ctx.Close()
-	defer ctx.ProvinceCache.Stop()
+	defer ctx.Close() // Close() 内部已调用 ProvinceCache.Stop()
 	defer middleware.StopRateLimiters()
 
 	ctx.ProvinceCache.Start(context.Background())

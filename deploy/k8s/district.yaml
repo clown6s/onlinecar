@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: district
+  namespace: onlinecar
+  labels:
+    app: district
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: district
+  template:
+    metadata:
+      labels:
+        app: district
+    spec:
+      containers:
+        - name: district
+          image: onlinecar/district:latest
+          ports:
+            - containerPort: 6002
+              name: grpc
+            - containerPort: 9102
+              name: metrics
+          envFrom:
+            - configMapRef:
+                name: onlinecar-env
+            - secretRef:
+                name: onlinecar-secrets
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "district.rpc"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: onlinecar-secrets
+                  key: mysql-app-password
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: onlinecar-secrets
+                  key: redis-password
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: district
+  namespace: onlinecar
+spec:
+  selector:
+    app: district
+  ports:
+    - port: 6002
+      targetPort: grpc
+      name: grpc
+    - port: 9102
+      targetPort: metrics
+      name: metrics
+  type: ClusterIP

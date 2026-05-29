@@ -4,6 +4,8 @@ package passenger;
 
 option go_package = "./pb";
 
+import "google/protobuf/timestamp.proto";
+
 // ========== 乘客服务 ==========
 service Passenger {
   // 注册
@@ -33,6 +35,7 @@ message RegisterResp {
   string passenger_name   = 2;
   string passenger_phone  = 3;
   int64  state            = 4; // 0有效 1失效
+  google.protobuf.Timestamp created_at = 5;
 }
 
 // 登录请求（手机号直接登录）
@@ -47,6 +50,7 @@ message LoginResp {
   string passenger_phone = 3;
   int64  state           = 4;
   string profile_photo   = 5;
+  google.protobuf.Timestamp created_at = 6;
 }
 
 // 获取乘客信息
@@ -83,7 +87,8 @@ message TripResp {
   string origin       = 4;
   string destination  = 5;
   int64  status       = 6;
-  double fare         = 7;
+  double fare         = 7; // TODO: 金额建议改为 string 避免浮点精度丢失，proto 改动需重新生成 Go 代码
+  google.protobuf.Timestamp created_at = 8;
 }
 
 // 检查手机号请求

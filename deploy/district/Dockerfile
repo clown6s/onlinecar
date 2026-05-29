@@ -29,4 +29,6 @@ COPY --from=builder --chown=appuser:appgroup /district /district
 COPY --from=builder --chown=appuser:appgroup /app/etc/district.yaml ./etc/district.yaml
 
 EXPOSE 6002
+HEALTHCHECK --interval=10s --timeout=5s --retries=3 --start-period=15s \
+  CMD nc -z localhost 6002 || exit 1
 CMD ["/district", "-f", "etc/district.yaml"]

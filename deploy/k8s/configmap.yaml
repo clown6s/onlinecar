@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: onlinecar-env
+  namespace: onlinecar
+data:
+  # gRPC 服务发现（etcd 地址，根据实际集群修改）
+  ETCD_HOSTS: "etcd-0.etcd:2379,etcd-1.etcd:2379,etcd-2.etcd:2379"
+  # OTEL
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.onlinecar:4317"
+  OTEL_TRACES_SAMPLER: "always_on"
+  # 日志
+  TZ: "Asia/Shanghai"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: onlinecar-secrets
+  namespace: onlinecar
+type: Opaque
+stringData:
+  # 警告：生产环境请使用外部密钥管理系统（如 Vault/KMS），不要将明文密钥提交到 Git
+  mysql-root-password: "CHANGE_ME"
+  mysql-app-password: "CHANGE_ME"
+  redis-password: "CHANGE_ME"
+  etcd-password: "CHANGE_ME"
+  driver-jwt-secret: "CHANGE_ME_DRIVER"
+  passenger-jwt-secret: "CHANGE_ME_PASSENGER"

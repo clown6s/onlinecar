@@ -2,8 +2,6 @@ package middleware
 
 import (
 	"net/http"
-
-	"github.com/zeromicro/go-zero/core/logx"
 )
 
 // CORSMiddleware 精确匹配 Origin（区分 localhost / 127.0.0.1 和端口变体）
@@ -14,9 +12,7 @@ type CORSMiddleware struct {
 
 func NewCORSMiddleware(origins ...string) *CORSMiddleware {
 	if len(origins) == 0 {
-		// 安全警告：无配置时不允许跨域，仅记录日志
-		logx.Severe("[CORS] 未配置 AllowOrigins，跨域请求将被拒绝")
-		origins = []string{} // 空列表 = 拒绝所有跨域
+		origins = []string{} // 空列表 = 拒绝所有跨域（安全默认行为）
 	}
 	return &CORSMiddleware{allowOrigins: origins}
 }

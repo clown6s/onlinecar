@@ -1,0 +1,52 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "HTTP Request Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "sum(rate(http_server_requests_duration_seconds_count{service=\"gateway\"}[5m])) by (method, path)", "legendFormat": "{{method}} {{path}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "title": "HTTP Error Rate (%)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "sum(rate(http_server_requests_duration_seconds_count{service=\"gateway\",code=~\"5..\"}[5m])) / sum(rate(http_server_requests_duration_seconds_count{service=\"gateway\"}[5m])) * 100", "legendFormat": "5xx error rate" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100 } }
+    },
+    {
+      "title": "gRPC Latency P99",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "histogram_quantile(0.99, sum(rate(grpc_server_handling_seconds_bucket[5m])) by (le, service, method))", "legendFormat": "{{service}} {{method}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "title": "Go Goroutines",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "go_goroutines{job=~\"gateway|driver|passenger|district\"}", "legendFormat": "{{job}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["onlinecar"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "OnlineCar API Overview",
+  "uid": "onlinecar-api-overview"
+}

@@ -7,7 +7,7 @@ package server
 import (
 	"context"
 
-	"onlinecar-district/internal/logic/districtservice"
+	districtservicelogic "onlinecar-district/internal/logic/districtservice"
 	"onlinecar-district/internal/svc"
 	"onlinecar-district/pb"
 )
