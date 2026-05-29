@@ -2,8 +2,8 @@ Name: passenger.rpc
 ListenOn: 0.0.0.0:6001
 Timeout: 30000
 GracefulShutdownTimeout: 25s
-KeepaliveTime: 30000
-KeepaliveTimeout: 10000
+KeepaliveTime: "30s"
+KeepaliveTimeout: "10s"
 
 Etcd:
   Hosts:
@@ -11,8 +11,6 @@ Etcd:
     - etcd-2:2379
     - etcd-3:2379
   Key: passenger.rpc
-  User: onlinecar
-  Pass: "OnlineCar@2026#EtcdApp"
 
 # MySQL
 DataSource: "onlinecar_app:${DB_APP_PASSWORD}@tcp(mysql:3306)/online_car?charset=utf8mb4&parseTime=true&loc=Local"

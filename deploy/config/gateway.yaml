@@ -21,10 +21,8 @@ DriverRpc:
       - etcd-2:2379
       - etcd-3:2379
     Key: driver.rpc
-    User: onlinecar
-    Pass: "OnlineCar@2026#EtcdApp"
   Timeout: 5000
-  KeepaliveTime: 30000
+  KeepaliveTime: "30s"
 
 # Passenger RPC
 PassengerRpc:
@@ -34,10 +32,8 @@ PassengerRpc:
       - etcd-2:2379
       - etcd-3:2379
     Key: passenger.rpc
-    User: onlinecar
-    Pass: "OnlineCar@2026#EtcdApp"
   Timeout: 5000
-  KeepaliveTime: 30000
+  KeepaliveTime: "30s"
 
 # District RPC
 DistrictRpc:
@@ -47,10 +43,8 @@ DistrictRpc:
       - etcd-2:2379
       - etcd-3:2379
     Key: district.rpc
-    User: onlinecar
-    Pass: "OnlineCar@2026#EtcdApp"
   Timeout: 5000
-  KeepaliveTime: 30000
+  KeepaliveTime: "30s"
 
 # Redis（短信验证码存储）
 RedisConf:
