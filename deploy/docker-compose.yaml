@@ -375,9 +375,9 @@ services:
       gateway:
         condition: service_healthy
       mysql-exporter:
-        condition: service_healthy
+        condition: service_started
       redis-exporter:
-        condition: service_healthy
+        condition: service_started
       etcd-1:
         condition: service_started
       etcd-2:
@@ -761,11 +761,7 @@ services:
         condition: service_healthy
     networks:
       - onlinecar
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9104"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
+    # prom/mysqld-exporter 基于 scratch，无 wget/shell，不设 healthcheck
     security_opt:
       - no-new-privileges:true
     deploy:
