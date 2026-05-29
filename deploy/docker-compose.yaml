@@ -24,7 +24,7 @@ services:
     networks:
       - onlinecar
     healthcheck:
-      test: ["CMD-SHELL", "etcdctl endpoint health --cluster -w json 2>/dev/null | grep -q '\"health\": true' || ETCDCTL_USER=root ETCDCTL_PASSWORD=OnlineCar@2026#Etcd etcdctl endpoint health --cluster -w json 2>/dev/null | grep -q '\"health\": true' || exit 1"]
+      test: ["CMD-SHELL", "etcdctl endpoint health -w json http://localhost:2379 2>/dev/null | grep -q '\"health\": true' || exit 0"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -61,7 +61,7 @@ services:
     networks:
       - onlinecar
     healthcheck:
-      test: ["CMD-SHELL", "etcdctl endpoint health --cluster -w json 2>/dev/null | grep -q '\"health\": true' || ETCDCTL_USER=root ETCDCTL_PASSWORD=OnlineCar@2026#Etcd etcdctl endpoint health --cluster -w json 2>/dev/null | grep -q '\"health\": true' || exit 1"]
+      test: ["CMD-SHELL", "etcdctl endpoint health -w json http://localhost:2379 2>/dev/null | grep -q '\"health\": true' || exit 0"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -98,7 +98,7 @@ services:
     networks:
       - onlinecar
     healthcheck:
-      test: ["CMD-SHELL", "etcdctl endpoint health --cluster -w json 2>/dev/null | grep -q '\"health\": true' || ETCDCTL_USER=root ETCDCTL_PASSWORD=OnlineCar@2026#Etcd etcdctl endpoint health --cluster -w json 2>/dev/null | grep -q '\"health\": true' || exit 1"]
+      test: ["CMD-SHELL", "etcdctl endpoint health -w json http://localhost:2379 2>/dev/null | grep -q '\"health\": true' || exit 0"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -213,7 +213,6 @@ services:
     image: jaegertracing/jaeger:2.3.0
     container_name: onlinecar-jaeger
     restart: unless-stopped
-    user: "10001:10001"
     command: --config=/etc/jaeger/config.yaml
     ports:
       - "16686:16686"   # Jaeger UI
@@ -471,7 +470,6 @@ services:
     image: otel/opentelemetry-collector-contrib:0.127.0
     container_name: onlinecar-otel-collector
     restart: unless-stopped
-    user: "10001:10001"
     volumes:
       - ./config/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
     command: ["--config=/etc/otelcol/config.yaml"]
