@@ -476,6 +476,7 @@ services:
       OTEL_SERVICE_NAME: driver.rpc
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_TRACES_SAMPLER: always_on
+      GOMEMLIMIT: 400MiB
       DB_PASSWORD: "OnlineCar@2026#Prod"
       DB_APP_PASSWORD: "${DB_APP_PASSWORD:-OnlineCar@2026#App}"
       REDIS_PASSWORD: "OnlineCar@2026#Redis"
@@ -500,10 +501,10 @@ services:
       resources:
         limits:
           cpus: "1.0"
-          memory: 512M
+          memory: 1G
         reservations:
           cpus: "0.25"
-          memory: 128M
+          memory: 256M
     logging:
       driver: json-file
       options:
@@ -518,6 +519,7 @@ services:
       OTEL_SERVICE_NAME: passenger.rpc
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_TRACES_SAMPLER: always_on
+      GOMEMLIMIT: 400MiB
       DB_PASSWORD: "OnlineCar@2026#Prod"
       DB_APP_PASSWORD: "${DB_APP_PASSWORD:-OnlineCar@2026#App}"
       REDIS_PASSWORD: "OnlineCar@2026#Redis"
@@ -542,10 +544,10 @@ services:
       resources:
         limits:
           cpus: "1.0"
-          memory: 512M
+          memory: 1G
         reservations:
           cpus: "0.25"
-          memory: 128M
+          memory: 256M
     logging:
       driver: json-file
       options:
@@ -560,6 +562,7 @@ services:
       OTEL_SERVICE_NAME: district.rpc
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_TRACES_SAMPLER: always_on
+      GOMEMLIMIT: 400MiB
       DB_PASSWORD: "OnlineCar@2026#Prod"
       DB_APP_PASSWORD: "${DB_APP_PASSWORD:-OnlineCar@2026#App}"
       REDIS_PASSWORD: "OnlineCar@2026#Redis"
@@ -584,10 +587,10 @@ services:
       resources:
         limits:
           cpus: "1.0"
-          memory: 512M
+          memory: 1G
         reservations:
           cpus: "0.25"
-          memory: 128M
+          memory: 256M
     logging:
       driver: json-file
       options:

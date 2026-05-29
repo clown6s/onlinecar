@@ -19,8 +19,6 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/health"
-	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
 )
 
@@ -42,7 +40,6 @@ func main() {
 
 	srv := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
 		pb.RegisterPassengerServer(grpcServer, passengerserver.NewPassengerServer(svcCtx))
-		grpc_health_v1.RegisterHealthServer(grpcServer, health.NewServer())
 	})
 	// 启动 Prometheus metrics HTTP 端点
 	defer grpcx.StartMetricsServer(c.MetricsPort, "passenger.rpc")()
