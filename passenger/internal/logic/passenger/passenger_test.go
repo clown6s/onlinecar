@@ -106,6 +106,18 @@ func (m *mockTripModel) UpdateWithStatusCheck(ctx context.Context, data *model.T
 	return true, nil
 }
 
+func (m *mockTripModel) FindOneWithConn(ctx context.Context, session sqlx.Session, id int64) (*model.Trip, error) {
+	return nil, nil
+}
+
+func (m *mockTripModel) CountByPassengerId(ctx context.Context, passengerId int64) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockTripModel) FindActiveTripsWithConn(ctx context.Context, session sqlx.Session, passengerId int64, statuses []int8) ([]*model.Trip, error) {
+	return nil, nil
+}
+
 type mockResult struct{ lastInsertID, rowsAffected int64 }
 
 func (r mockResult) LastInsertId() (int64, error) { return r.lastInsertID, nil }

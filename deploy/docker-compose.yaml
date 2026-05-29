@@ -15,6 +15,7 @@ services:
       ETCD_ADVERTISE_CLIENT_URLS: http://etcd-1:2379
       ETCD_INITIAL_CLUSTER: etcd1=http://etcd-1:2380,etcd2=http://etcd-2:2380,etcd3=http://etcd-3:2380
       ETCD_CLUSTER_STATE: new
+      TZ: Asia/Shanghai
     # 端口不暴露到宿主机，仅容器内网络可访问
     # ports:
     #   - "2379:2379"
@@ -28,8 +29,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-    environment:
-      TZ: Asia/Shanghai
     security_opt:
       - no-new-privileges:true
     deploy:
@@ -67,8 +66,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-    environment:
-      TZ: Asia/Shanghai
     security_opt:
       - no-new-privileges:true
     deploy:
@@ -106,8 +103,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-    environment:
-      TZ: Asia/Shanghai
     security_opt:
       - no-new-privileges:true
     deploy:
@@ -237,8 +232,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
-    environment:
-      TZ: Asia/Shanghai
     security_opt:
       - no-new-privileges:true
     deploy:
@@ -273,8 +266,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
-    environment:
-      TZ: Asia/Shanghai
     security_opt:
       - no-new-privileges:true
     deploy:
@@ -494,8 +485,6 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-    environment:
-      TZ: Asia/Shanghai
     security_opt:
       - no-new-privileges:true
     deploy:
