@@ -261,7 +261,7 @@ services:
     security_opt:
       - no-new-privileges:true
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:9080/ready || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O/dev/null http://localhost:9080/ready || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -429,7 +429,7 @@ services:
     networks:
       - onlinecar
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:13133/"]
+      test: ["CMD-SHELL", "wget -q -O/dev/null http://localhost:13133/ || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -667,7 +667,7 @@ services:
     networks:
       - onlinecar
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/healthz"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -730,7 +730,7 @@ services:
     networks:
       - onlinecar
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9121/metrics"]
+      test: ["CMD-SHELL", "wget -q -O/dev/null http://localhost:9121/metrics || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
