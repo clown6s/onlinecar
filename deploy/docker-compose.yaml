@@ -212,12 +212,7 @@ services:
       - jaeger_data:/var/lib/jaeger
     networks:
       - onlinecar
-    healthcheck:
-      test: ["CMD-SHELL", "cat /proc/1/status 2>/dev/null || exit 0"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
+    # jaeger 2.x 镜像基于 distroless，无 shell，不设 healthcheck
     security_opt:
       - no-new-privileges:true
     deploy:
@@ -506,7 +501,7 @@ services:
   # 密码通过环境变量注入，脚本具备幂等性（重复执行不会失败）
   # 依赖 etcd service_started，脚本内自行重试等待 etcd 就绪
   etcd-setup:
-    image: quay.io/coreos/etcd:v3.6.9
+    image: bitnami/etcd:3.6.9
     depends_on:
       etcd-1:
         condition: service_started
