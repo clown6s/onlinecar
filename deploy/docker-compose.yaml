@@ -16,9 +16,6 @@ services:
       ETCD_INITIAL_CLUSTER: etcd1=http://etcd-1:2380,etcd2=http://etcd-2:2380,etcd3=http://etcd-3:2380
       ETCD_CLUSTER_STATE: new
       TZ: Asia/Shanghai
-    # 端口不暴露到宿主机，仅容器内网络可访问
-    # ports:
-    #   - "2379:2379"
     volumes:
       - etcd1_data:/etcd-data
     networks:
@@ -120,9 +117,6 @@ services:
       - --slow-query-log=1
       - --long-query-time=2
       - --log-queries-not-using-indexes=1
-    # 端口不暴露到宿主机，仅容器内网络可访问
-    # ports:
-    #   - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
@@ -159,9 +153,6 @@ services:
       --maxmemory-policy allkeys-lru
       --appendonly yes
       --appendfsync everysec
-    # 端口不暴露到宿主机
-    # ports:
-    #   - "6379:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -192,25 +183,19 @@ services:
         max-size: "50m"
         max-file: "3"
 
-  # Jaeger 链路追踪 v2
-  # 镜像基于 distroless，无 wget/curl，健康检查用 /proc
+  # Jaeger 链路追踪 v2（distroless 镜像，无 shell，不设 healthcheck）
   jaeger:
     image: jaegertracing/jaeger:2.3.0
     container_name: onlinecar-jaeger
     restart: unless-stopped
     command: --config=/etc/jaeger/config.yaml
     ports:
-      - "16686:16686"   # Jaeger UI
-    # OTLP 端口仅容器内访问
-    # ports:
-    #   - "4317:4317"
-    #   - "4318:4318"
+      - "16686:16686"
     volumes:
       - ./config/jaeger-config.yaml:/etc/jaeger/config.yaml:ro
       - jaeger_data:/var/lib/jaeger
     networks:
       - onlinecar
-    # jaeger 2.x 镜像基于 distroless，无 shell，不设 healthcheck
     security_opt:
       - no-new-privileges:true
     deploy:
@@ -232,9 +217,6 @@ services:
     image: grafana/loki:3.5.1
     restart: unless-stopped
     user: "loki:loki"
-    # 端口不暴露到宿主机，仅容器内网络可访问（Grafana 通过容器网络连接）
-    # ports:
-    #   - "3100:3100"
     volumes:
       - loki_data:/loki
     networks:
@@ -346,7 +328,7 @@ services:
         max-size: "50m"
         max-file: "3"
 
-  # Prometheus 指标采集
+  # Prometheus 指标采集（scratch 镜像，无 shell，不设 healthcheck）
   prometheus:
     image: prom/prometheus:v3.11.2
     container_name: onlinecar-prometheus
@@ -367,13 +349,13 @@ services:
       TZ: Asia/Shanghai
     depends_on:
       driver:
-        condition: service_healthy
+        condition: service_started
       passenger:
-        condition: service_healthy
+        condition: service_started
       district:
-        condition: service_healthy
+        condition: service_started
       gateway:
-        condition: service_healthy
+        condition: service_started
       mysql-exporter:
         condition: service_started
       redis-exporter:
@@ -388,7 +370,6 @@ services:
         condition: service_healthy
     networks:
       - onlinecar
-    # prom/prometheus v3 基于 scratch，无 wget/shell，不设 healthcheck
     security_opt:
       - no-new-privileges:true
     deploy:
@@ -405,7 +386,7 @@ services:
         max-size: "100m"
         max-file: "3"
 
-  # Alertmanager 告警管理
+  # Alertmanager 告警管理（scratch 镜像，无 shell，不设 healthcheck）
   alertmanager:
     image: prom/alertmanager:v0.28.1
     container_name: onlinecar-alertmanager
@@ -422,7 +403,6 @@ services:
       TZ: Asia/Shanghai
     networks:
       - onlinecar
-    # prom/alertmanager 基于 scratch，无 wget/shell，不设 healthcheck
     security_opt:
       - no-new-privileges:true
     deploy:
@@ -486,17 +466,12 @@ services:
         max-size: "10m"
         max-file: "1"
 
-  # ========== 业务服务 ==========
+  # ========== 业务服务（distroless 镜像，无 shell/nc，不设 healthcheck）==========
+
   driver:
     build:
       context: ..
       dockerfile: deploy/driver/Dockerfile
-    # gRPC 端口仅容器内互通，不暴露
-    # ports:
-    #   - "6000:6000"
-    # Prometheus metrics 端口（仅容器内网络，Prometheus 通过容器名访问）
-    # ports:
-    #   - "9100:9100"
     environment:
       OTEL_SERVICE_NAME: driver.rpc
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
@@ -521,12 +496,6 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-    healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "6000"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
     deploy:
       resources:
         limits:
@@ -545,12 +514,6 @@ services:
     build:
       context: ..
       dockerfile: deploy/passenger/Dockerfile
-    # gRPC 端口仅容器内互通，不暴露
-    # ports:
-    #   - "6001:6001"
-    # Prometheus metrics 端口（仅容器内网络，Prometheus 通过容器名访问）
-    # ports:
-    #   - "9101:9101"
     environment:
       OTEL_SERVICE_NAME: passenger.rpc
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
@@ -575,12 +538,6 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-    healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "6001"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
     deploy:
       resources:
         limits:
@@ -599,12 +556,6 @@ services:
     build:
       context: ..
       dockerfile: deploy/district/Dockerfile
-    # gRPC 端口仅容器内互通，不暴露
-    # ports:
-    #   - "6002:6002"
-    # Prometheus metrics 端口（仅容器内网络，Prometheus 通过容器名访问）
-    # ports:
-    #   - "9102:9102"
     environment:
       OTEL_SERVICE_NAME: district.rpc
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
@@ -629,12 +580,6 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-    healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "6002"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
     deploy:
       resources:
         limits:
@@ -649,13 +594,11 @@ services:
         max-size: "100m"
         max-file: "3"
 
+  # gateway 基于 alpine，有 wget，可以设 healthcheck
   gateway:
     build:
       context: ..
       dockerfile: deploy/gateway/Dockerfile
-    # Gateway 仅容器内网络访问，通过 Nginx 反向代理对外暴露
-    # ports:
-    #   - "7000:7000"
     expose:
       - "7000"
     environment:
@@ -668,11 +611,11 @@ services:
       log-init:
         condition: service_completed_successfully
       driver:
-        condition: service_healthy
+        condition: service_started
       passenger:
-        condition: service_healthy
+        condition: service_started
       district:
-        condition: service_healthy
+        condition: service_started
       jaeger:
         condition: service_started
     volumes:
@@ -688,7 +631,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 15s
+      start_period: 30s
     deploy:
       resources:
         limits:
@@ -705,7 +648,6 @@ services:
 
   # ========== 反向代理 ==========
 
-  # Nginx 反向代理（TLS 终止、速率限制、安全响应头）
   nginx:
     image: nginx:1.27-alpine
     container_name: onlinecar-nginx
@@ -714,15 +656,12 @@ services:
       TZ: Asia/Shanghai
     ports:
       - "80:80"
-      # 生产环境启用 TLS 后开放 443
-      # - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      # - ./nginx/ssl:/etc/nginx/ssl:ro
       - nginx_logs:/var/log/nginx
     depends_on:
       gateway:
-        condition: service_healthy
+        condition: service_started
     networks:
       - onlinecar
     healthcheck:
@@ -749,7 +688,7 @@ services:
 
   # ========== Exporter ==========
 
-  # MySQL Exporter（Prometheus 采集 MySQL 指标）
+  # MySQL Exporter（scratch 镜像，无 shell，不设 healthcheck）
   mysql-exporter:
     image: prom/mysqld-exporter:v0.15.1
     restart: unless-stopped
@@ -761,7 +700,6 @@ services:
         condition: service_healthy
     networks:
       - onlinecar
-    # prom/mysqld-exporter 基于 scratch，无 wget/shell，不设 healthcheck
     security_opt:
       - no-new-privileges:true
     deploy:
@@ -775,7 +713,7 @@ services:
         max-size: "20m"
         max-file: "2"
 
-  # Redis Exporter（Prometheus 采集 Redis 指标）
+  # Redis Exporter
   redis-exporter:
     image: oliver006/redis_exporter:v1.58.0
     restart: unless-stopped
