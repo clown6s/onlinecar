@@ -46,22 +46,23 @@ DistrictRpc:
   Timeout: 5000
   KeepaliveTime: "30s"
 
-# Redis（短信验证码存储）
+# Redis
 RedisConf:
   Host: redis:6379
   Pass: "OnlineCar@2026#Redis"
   Type: node
 
-# CORS（生产环境指定具体域名）
+# CORS
 CORS:
   AllowOrigins:
     - "https://app.onlinecar.com"
     - "https://admin.onlinecar.com"
 
-# 日志（file 模式，Promtail 采集）
+# 日志：console 模式输出到 stdout，docker logs 可见
+# 服务稳定后改回 file 模式，由 Promtail 采集
 Log:
   ServiceName: gateway-api
-  Mode: file
+  Mode: console
   Path: /var/log/onlinecar
   Level: info
   Encoding: json

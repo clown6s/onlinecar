@@ -16,7 +16,7 @@ Etcd:
 DataSource: "onlinecar_app:${DB_APP_PASSWORD}@tcp(mysql:3306)/online_car?charset=utf8mb4&parseTime=true&loc=Local"
 MaxOpenConns: 100
 MaxIdleConns: 20
-ConnMaxLifetime: 300  # 秒
+ConnMaxLifetime: 300
 
 # Redis
 RedisConf:
@@ -24,13 +24,14 @@ RedisConf:
   Type: node
   Pass: "OnlineCar@2026#Redis"
 
-# Prometheus metrics 端口
+# Prometheus metrics
 MetricsPort: 9100
 
-# 日志（file 模式，Promtail 采集）
+# 日志：console 模式输出到 stdout，docker logs 可见
+# 服务稳定后改回 file 模式，由 Promtail 采集
 Log:
   ServiceName: driver.rpc
-  Mode: file
+  Mode: console
   Path: /var/log/onlinecar
   Level: info
   Encoding: json
