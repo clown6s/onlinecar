@@ -196,8 +196,7 @@ services:
       - jaeger_data:/var/lib/jaeger
     networks:
       - onlinecar
-    security_opt:
-      - no-new-privileges:true
+    user: "0:0"
     deploy:
       resources:
         limits:
@@ -696,7 +695,7 @@ services:
     image: prom/mysqld-exporter:v0.15.1
     restart: unless-stopped
     environment:
-      DATA_SOURCE_NAME: "onlinecar_app:${DB_APP_PASSWORD:-OnlineCar@2026#App}@tcp(mysql:3306)/online_car"
+      DATA_SOURCE_NAME: "onlinecar_app:OnlineCar%402026%23App@tcp(mysql:3306)/online_car"
       TZ: Asia/Shanghai
     depends_on:
       mysql:
