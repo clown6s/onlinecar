@@ -429,7 +429,7 @@ services:
     networks:
       - onlinecar
     # OTEL Collector 镜像基于 distroless，无 shell，无法执行 healthcheck
-    networks:
+    security_opt:
       - no-new-privileges:true
     deploy:
       resources:
