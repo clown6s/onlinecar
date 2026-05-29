@@ -23,6 +23,7 @@ DriverRpc:
     Key: driver.rpc
   Timeout: 5000
   KeepaliveTime: "30s"
+  HasHealthCheck: false
 
 # Passenger RPC
 PassengerRpc:
@@ -34,6 +35,7 @@ PassengerRpc:
     Key: passenger.rpc
   Timeout: 5000
   KeepaliveTime: "30s"
+  HasHealthCheck: false
 
 # District RPC
 DistrictRpc:
@@ -45,6 +47,7 @@ DistrictRpc:
     Key: district.rpc
   Timeout: 5000
   KeepaliveTime: "30s"
+  HasHealthCheck: false
 
 # Redis
 RedisConf:

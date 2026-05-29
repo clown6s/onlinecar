@@ -23,21 +23,21 @@ func HealthHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		details := make(map[string]string)
 
-		driverOk := checkGRPCHealth(svcCtx.DriverConn, "driver.rpc")
+		driverOk := checkGRPCHealth(svcCtx.DriverConn, "")
 		if driverOk {
 			details["driver"] = "ok"
 		} else {
 			details["driver"] = "unhealthy"
 		}
 
-		passengerOk := checkGRPCHealth(svcCtx.PassengerConn, "passenger.rpc")
+		passengerOk := checkGRPCHealth(svcCtx.PassengerConn, "")
 		if passengerOk {
 			details["passenger"] = "ok"
 		} else {
 			details["passenger"] = "unhealthy"
 		}
 
-		districtOk := checkGRPCHealth(svcCtx.DistrictConn, "district.rpc")
+		districtOk := checkGRPCHealth(svcCtx.DistrictConn, "")
 		if districtOk {
 			details["district"] = "ok"
 		} else {
