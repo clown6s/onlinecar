@@ -369,7 +369,7 @@ services:
 
   # Prometheus 指标采集
   prometheus:
-    image: prom/prometheus:v3.4.2
+    image: prom/prometheus:v3.11.2
     container_name: onlinecar-prometheus
     restart: unless-stopped
     user: "65534:65534"
