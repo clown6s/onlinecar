@@ -261,7 +261,7 @@ services:
     security_opt:
       - no-new-privileges:true
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9080/ready"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9080/ready || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -667,7 +667,7 @@ services:
     networks:
       - onlinecar
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/healthz"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/"]
       interval: 10s
       timeout: 5s
       retries: 3
